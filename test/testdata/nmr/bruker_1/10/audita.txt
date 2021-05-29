@@ -1,0 +1,27 @@
+##TITLE= Audit trail, TOPSPIN		Version 3.2
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nmrsu
+$$ Z:/data/AG_Schubert/nmr/JS304b/10/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, PROCESS, VERSION, WHAT)
+(   1,<2019-01-22 09:49:31.609 +0100>,<nmrsu>,<f300-oc>,<go>,<TOPSPIN 3.2>,
+      <created by zg
+	started at 2019-01-22 09:47:33.404 +0100,
+	POWCHK enabled, PULCHK disabled,
+       configuration hash MD5:
+       FF F7 61 26 F6 59 E5 B2 AA BD 7A 35 1E 08 28 AD
+       data hash MD5: 64K
+       62 AE 8A EB 59 AE 06 B5 51 5C F8 F0 D3 1B 0A 4F>)
+(   2,<2019-01-22 09:49:32.116 +0100>,<nmrsu>,<f300-oc>,<audit>,<TOPSPIN 3.2>,
+      <user comment:
+       ICON-NMR User ID: AG_Schubert
+       data hash MD5: 64K
+       62 AE 8A EB 59 AE 06 B5 51 5C F8 F0 D3 1B 0A 4F>)
+(   3,<2019-01-22 09:49:33.759 +0100>,<nmrsu>,<f300-oc>,<dirdata>,<TOPSPIN 3.2>,
+      <wrpa from 1 10 "JS304b" "C:/NMR-Daten/data/AG_Schubert/nmr"
+       data hash MD5: 64K
+       62 AE 8A EB 59 AE 06 B5 51 5C F8 F0 D3 1B 0A 4F>)
+##END=
+
+$$ hash MD5
+$$ 5D 8B E7 20 93 AA 9B 0F B4 DF 18 B1 8B E2 7F 43

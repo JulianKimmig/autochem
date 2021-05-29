@@ -1,0 +1,64 @@
+# Tue Jan 22 09:47:58 2019
+#$$PROBEID=34
+#$$PROBEINFO=5 mm DUL 13C-1H/D Z-GRD Z111650/0065
+#$$PICSINFO=Z111650_0065_34.par
+#
+# Active Shim Gradients
+#
+Z           		-1731           
+Z2          		-834            
+Z3          		-201            
+Z4          		4409            
+Z5          		2578            
+Z6          		1748            
+X           		2554            
+XZ          		-258            
+XZ2         		-2634           
+XZ3         		-5087           
+Y           		-2816           
+YZ          		-1112           
+YZ2         		-1845           
+YZ3         		-4420           
+XY          		534             
+XYZ         		5773            
+(X2-Y2)     		30              
+(X2-Y2)Z    		-1531           
+X3          		728             
+Y3          		-1309           
+#
+# Lock Parameter
+#
+FIELD		2430.000
+LOCKPHASE		222.000 
+LOCKPOWER		12.000  
+LOCKGAIN		78.300  
+LOCKDC		0.000   
+LOCKSHIFT		7.240   
+LOOPGAIN		0.400   
+LOOPTIME		0.400   
+LOOPFILTER		1000.000
+#
+IEEE64_VERSION_CODE 1
+#
+# Shim currents 
+#
+SHIM_SETTING [1 ]  -1731.00000000  
+SHIM_SETTING [2 ]  -834.00000000   
+SHIM_SETTING [3 ]  -201.00000000   
+SHIM_SETTING [4 ]  4409.00000000   
+SHIM_SETTING [5 ]  2578.00000000   
+SHIM_SETTING [6 ]  1748.00000000   
+SHIM_SETTING [7 ]  2554.00000000   
+SHIM_SETTING [8 ]  -258.00000000   
+SHIM_SETTING [9 ]  -2634.00000000  
+SHIM_SETTING [10]  -5087.00000000  
+SHIM_SETTING [11]  -2816.00000000  
+SHIM_SETTING [12]  -1112.00000000  
+SHIM_SETTING [13]  -1845.00000000  
+SHIM_SETTING [14]  -4420.00000000  
+SHIM_SETTING [15]  534.00000000    
+SHIM_SETTING [16]  5773.00000000   
+SHIM_SETTING [17]  30.00000000     
+SHIM_SETTING [18]  -1531.00000000  
+SHIM_SETTING [19]  728.00000000    
+SHIM_SETTING [20]  -1309.00000000  

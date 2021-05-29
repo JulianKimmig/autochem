@@ -1,0 +1,16 @@
+##TITLE= Parameter file, TOPSPIN		Version 3.2
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nmrsu
+$$ 2019-01-22 09:49:33.777 +0100  nmrsu@f300-oc
+$$ Z:/data/AG_Schubert/nmr/JS304b/10/pdata/1/outd
+$$ process C:\Bruker\TopSpin3.2pl5\prog\mod\dirdata.exe
+##$CURPLOT= <PDF Complete>
+##$CURPRIN= <$PDF Complete>
+##$DFORMAT= <normdp>
+##$LAYOUT= <+/1D_1H_fourie.xwp>
+##$LFORMAT= <normlp>
+##$PFORMAT= <normpl>
+##END=

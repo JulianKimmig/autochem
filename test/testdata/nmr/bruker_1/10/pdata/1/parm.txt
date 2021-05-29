@@ -1,0 +1,40 @@
+
+Current Data Parameters
+NAME             JS304b              
+EXPNO                10              
+PROCNO                1              
+
+F2 - Acquisition Parameters
+Date_          20190122              
+Time               9.47              
+INSTRUM      FOURIER300              
+PROBHD   5 mm DUL 13C-1              
+PULPROG            zg30              
+TD                65536              
+SOLVENT           CDCl3              
+NS                   16              
+DS                    2              
+SWH            6103.516 Hz           
+FIDRES         0.093132 Hz           
+AQ            5.3687091 sec          
+RG               4.5293              
+DW               81.920 usec         
+DE                 6.50 usec         
+TE                297.1 K            
+D1           1.00000000 sec          
+TD0                   1              
+
+======== CHANNEL f1 ========
+SFO1        300.1918538 MHz          
+NUC1                 1H              
+P1                11.00 usec         
+PLW1        17.00000000 W            
+
+F2 - Processing parameters
+SI                65536              
+SF          300.1900000 MHz          
+WDW                  EM              
+SSB      0              
+LB                 0.30 Hz           
+GB       0              
+PC                 1.00              
