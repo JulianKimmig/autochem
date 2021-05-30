@@ -39,4 +39,8 @@ def read_magritek(path):
         udic[0]['sw'] *=1000
 
     udic[0]['car'] = float(udic["acqu"]["lowestFrequency"]) + udic[0]['sw']/ 2
+
+    udic["datatype"]="magritek"
+    udic["dic"]=dic
+    udic[0]['complex']=np.iscomplex(data).any()
     return udic,data
