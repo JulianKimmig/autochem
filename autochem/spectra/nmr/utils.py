@@ -16,12 +16,12 @@ def process_nmr_signal(data):
     return p_data
 
 
-def sort_ppm(ppm_scale,data):
-    return sort_xy(ppm_scale,data)
+def sort_ppm(ppm_scale, data):
+    return sort_xy(ppm_scale, data)
 
 
-def zoom(data, ppm_scale, xmin, xmax ):
-    ppm_scale,data = sort_ppm(ppm_scale,data)
+def zoom(data, ppm_scale, xmin, xmax):
+    ppm_scale, data = sort_ppm(ppm_scale, data)
     idx_min = (np.abs(ppm_scale - xmin)).argmin()
     idx_max = (np.abs(ppm_scale - xmax)).argmin()
     return data[idx_min:idx_max], ppm_scale[idx_min:idx_max]
