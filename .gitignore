@@ -1,2 +1,5 @@
 /.idea/
 /autochem.iml
+/build
+/dist!
+/cmd.spec
