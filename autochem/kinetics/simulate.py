@@ -80,17 +80,21 @@ def simulate_reaction_set(reaction_matrix,reaction_rates,initial_concentrations,
                      )
 
 if __name__ == '__main__':
+    #2H-->3H
+    #2Fs--->3F
+    #F+H--->F
+
     rm=[
-        [[1,1,0,0,0,0,0],[0,0,1,0,0,0,0]],
-        [[1,0,1,0,0,0,0],[0,0,0,1,0,0,0]],
-        [[1,0,0,1,0,0,0],[0,0,0,0,1,0,0]],
+        [[1,1,0],[0,2,0]],
+        [[0,1,0],[0,0,1]],
     ]
     rc=[
-        [0.5,0],
-        [0.5,0],
-        [0.5,0],
+        [0.005,0],
+        [0.3,0],
     ]
-    ic=[3,7,0,0,0,0,0]
+
+    ic=[1000,1,0]
+
     rm=np.array(rm)
     rc=np.array(rc)
     ic=np.array(ic)
@@ -100,23 +104,45 @@ if __name__ == '__main__':
         plt.plot(r["t"],c)
     plt.show()
     plt.close()
+    #
+    #
+    # rm=[
+    #     [[1,1,0,0,0,0,0],[0,0,1,0,0,0,0]],
+    #     [[1,0,1,0,0,0,0],[0,0,0,1,0,0,0]],
+    #     [[1,0,0,1,0,0,0],[0,0,0,0,1,0,0]],
+    # ]
+    # rc=[
+    #     [0.5,0],
+    #     [0.5,0],
+    #     [0.5,0],
+    # ]
+    # ic=[3,7,0,0,0,0,0]
+    # rm=np.array(rm)
+    # rc=np.array(rc)
+    # ic=np.array(ic)
+    # times = np.linspace(0,5,20)
+    # r=simulate_reaction_set(rm, rc, ic, times)
+    # for c in  r["y"]:
+    #     plt.plot(r["t"],c)
+    # plt.show()
+    # plt.close()
 
-
-    rm=[
-        [[1,1,0,0],[0,0,1,0]],
-        [[0,0,1,0],[0,0,0,1]],
-    ]
-    rc=[
-        [4,0.04],
-        [0.05,0],
-    ]
-    ic=[0.01,0.01,0,0]
-    rm=np.array(rm)
-    rc=np.array(rc)
-    ic=np.array(ic)
-    times = np.linspace(0,100,100)
-    r=simulate_reaction_set(rm, rc, ic, times,constants=np.array([False,False,False,False]))
-    for c in  r["y"]:
-        plt.plot(r["t"],c)
-    plt.show()
-    plt.close()
+    #
+    # rm=[
+    #     [[1,1,0,0],[0,0,1,0]],
+    #     [[0,0,1,0],[0,0,0,1]],
+    # ]
+    # rc=[
+    #     [4,0.04],
+    #     [0.05,0],
+    # ]
+    # ic=[0.01,0.01,0,0]
+    # rm=np.array(rm)
+    # rc=np.array(rc)
+    # ic=np.array(ic)
+    # times = np.linspace(0,100,100)
+    # r=simulate_reaction_set(rm, rc, ic, times,constants=np.array([False,False,False,False]))
+    # for c in  r["y"]:
+    #     plt.plot(r["t"],c)
+    # plt.show()
+    # plt.close()
