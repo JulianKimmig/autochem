@@ -1,16 +1,20 @@
+def norm_nm(x,n,m):
+    _m=(m-n)/(x.max()-x.min())
+    _c=-(x.min()*_m) + n
+    return x*_m +_c, [_m,_c]
+
+def norm_n1(x,n):
+    return norm_nm(x,n,1)
+
 def norm_01(x):
-    unf1 = x.min()
-    x = x - x.min()
-    unf2 = x.max()
-    x = x / x.max()
-
-    def _unnorm(x):
-        x = x * unf2
-        x = x + unf1
-        return x
-
-    return x, {"unnorm": _unnorm}
-
+    return norm_nm(x,0,1)
 
 def norm_data(x):
     return norm_01(x)
+
+
+def shift_data(x,n):
+    return x-n, [1,-n]
+
+def scale_data(x,n):
+    return x*n,[n,0]

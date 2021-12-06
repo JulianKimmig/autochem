@@ -24,4 +24,4 @@ def zoom(data, ppm_scale, xmin, xmax):
     ppm_scale, data = sort_ppm(ppm_scale, data)
     idx_min = (np.abs(ppm_scale - xmin)).argmin()
     idx_max = (np.abs(ppm_scale - xmax)).argmin()
-    return data[idx_min:idx_max], ppm_scale[idx_min:idx_max],(idx_min,idx_max)
+    return data[idx_min:idx_max], ppm_scale[idx_min:idx_max],[int(idx_min),int(idx_max)]

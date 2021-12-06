@@ -30,8 +30,9 @@ def simulate_reaction_set(reaction_matrix,reaction_rates,initial_concentrations,
     constant_fac=(~constants).astype(int)
 
     def fun(t,y):
+        #print(t)
         dc=np.zeros_like(y)
-        log_y=np.log(y)
+        log_y=np.nan_to_num(np.log(y))
         #print("log_y",log_y)
 
         for reac_idx in reaction_indices:
@@ -39,23 +40,30 @@ def simulate_reaction_set(reaction_matrix,reaction_rates,initial_concentrations,
             ln_rate=ln_reaction_rates[reac_idx]
 
             #forward
-            v_fwd=ln_rate[0]+np.nan_to_num(reaction[0]*log_y).sum()
+            # da/dt = kn * ca**A * cb**b * ...
+            # log(da/dt)= log(kn * ca**A * cb**b * ...) = log(kn) + log(ca**A) + log(cb**b) + ...
+            # = log(kn) + A*log(ca) + b*log(cb) + ...
+            v_fwd=ln_rate[0]+(reaction[0]*log_y).sum()
             v_fwd=np.exp(v_fwd)
             dc-=v_fwd*reaction[0]
             dc+=v_fwd*reaction[1]
+            #print(reac_idx,v_fwd*reaction[0])
+
             #for r_idx in reactand_indices:
             #    c[i]+=
 
             #backwards
-            v_bwd=ln_rate[1]+np.nan_to_num(reaction[1]*log_y).sum()
+            v_bwd=ln_rate[1]+(reaction[1]*log_y).sum()
             v_bwd=np.exp(v_bwd)
             dc-=v_bwd*reaction[1]
             dc+=v_bwd*reaction[0]
+            #print(reac_idx,v_bwd*reaction[1])
             #print(v_fwd,v_bwd)
             #print(reaction[0]*log_y,reaction[1]*log_y)
             #print(np.nan_to_num(reaction[0]*log_y),np.nan_to_num(reaction[1]*log_y))
             #break
 
+        #dc[-dc>y]=-y[-dc>y] # max change is max available
         dc*=constant_fac
 
 
@@ -67,7 +75,9 @@ def simulate_reaction_set(reaction_matrix,reaction_rates,initial_concentrations,
         t_eval=times
     else:
         t_eval=None
-    return solve_ivp(fun, (times.min(),times.max()), initial_concentrations,t_eval=t_eval)
+    return solve_ivp(fun, (times.min(),times.max()), initial_concentrations,t_eval=t_eval,
+                     method="Radau"
+                     )
 
 if __name__ == '__main__':
     rm=[

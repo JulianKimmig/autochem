@@ -17,11 +17,6 @@ def rubberband_correction(x, y):
         "baseline": bl
     }
 
-def median_correction(y:np.ndarray):
-    med=np.median(y)
-    return y - med, {
-        "median": med
-    }
 
 
 

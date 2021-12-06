@@ -1,47 +1,3 @@
-import json
-
-#FOLDER = "C:\\Users\\be34gof\\Downloads\\TSU-141-E"
-FOLDER = "C:\\Users\\be34gof\\Downloads\\25_11_2021"
-MIN_PEAK_HEIGHT = 0.01  # minimum peak height relative to the largest peak
-PEAK_BOARDER_RELATIVE_HEIGHT = 0.01  # peak height relative to the peak maximum which sets the integration limits
-MAX_PEAK_WIDTH = 1  # maximum peak with, to limit very small and broad peaks
-MIN_PEAK_DISTANCE = 0.1  # minimum peak distance, clsoer peaks are counted as one
-
-ALLOW_PPM_STRETCH = False  # weather the ppm scale can be stretched to get expected peaks
-
-FIXED_SCALE = [0, 6]
-EXPECTED_PEAKS = [2.7, 3.9, 4.5]  # list of expected peaks for shift correction
-MANUAL_PEAKS = [2.7, 3.9, 4.12, 4.3, 4.5]  # list of expected peaks for shift correction
-MANUAL_PEAK_RANGES = [
-    [2.40, 3.3],
-    [3.8, 4.0],
-    [4.0, 4.15],
-    [4.15, 4.40],
-    [4.40, 4.78],
-]
-
-SPECIES_PEAKS = [[2.7], [3.9], [4.12], [4.3], [4.5]]
-SPECIES_PEAK_AREAS = [[6], [2], [4], [6], [6]]
-SPECIES_PEAKS_NAMES = ["OME-CH3","OME-1","OME-2","OME-3+","Trioxane"]
-
-# REFERENCE_PEAK=None
-REFERENCE_PEAK = 2.7  # reference peak used as integration standart
-REFERENCE_PEAK_AREA = 6  # area of the reference peak
-REFERENCE_PEAK_WINDOW = 0.4  # maximum derivation from the reference peak
-
-PLOT_INTERMEDIATES = True  # plot all intermediate steps
-PLOT_RESULT = True  # plot result
-SHOW_PLOTS = True  # live show plots, normally False
-
-CREATE_TABLE = True  # results are stored as table files
-RESULT_TABLE = True  # merge all results to on table
-RECREATE = False  # recalc spec even if it is already in the results table
-TABLE_TYPE = "xlsx"  # type of table data, use 'xlsx' for an excel-file or 'csv' for a csv-file
-
-
-
-## dont do stuff here
-
 import logging
 import sys, os
 
@@ -60,17 +16,54 @@ if __name__ == '__main__':
 
     logging.basicConfig()
 
+FOLDER = "C:\\Users\\be34gof\\Downloads\\24_11_2021"
+MIN_PEAK_HEIGHT = 0.1  # minimum peak height relative to the largest peak
+PEAK_BOARDER_RELATIVE_HEIGHT = 0.1  # peak height relative to the peak maximum which sets the integration limits
+MAX_PEAK_WIDTH = 1  # maximum peak with, to limit very small and broad peaks
+MIN_PEAK_DISTANCE = 0.1  # minimum peak distance, clsoer peaks are counted as one
+
+ALLOW_PPM_STRETCH = False  # weather the ppm scale can be stretched to get expected peaks
+
+FIXED_SCALE = [0, 6]
+EXPECTED_PEAKS = [2.7, 3.9, 4.5]  # list of expected peaks for shift correction
+MANUAL_PEAKS = [2.7, 3.9, 4.12, 4.3, 4.5]  # list of expected peaks for shift correction
+MANUAL_PEAK_RANGES = [
+    [2.5, 3.3],
+    [3.8, 4.05],
+    [4.05, 4.23],
+    [4.23, 4.47],
+    [4.47, 4.78],
+]
+
+SPECIES_PEAKS = [[2.8], [3.9], [4.12], [4.3], [4.5]]
+SPECIES_PEAK_AREAS = [[6], [2], [4], [6], [6]]
+SPECIES_PEAKS_NAMES = ["OME-CH3","OME-1","OME-2","OME-3+","Trioxane"]
+
+# REFERENCE_PEAK=None
+REFERENCE_PEAK = 2.7  # reference peak used as integration standart
+REFERENCE_PEAK_AREA = 6  # area of the reference peak
+REFERENCE_PEAK_WINDOW = 0.4  # maximum derivation from the reference peak
+
+PLOT_INTERMEDIATES = True  # plot all intermediate steps
+PLOT_RESULT = True  # plot result
+SHOW_PLOTS = True  # live show plots, normally False
+
+CREATE_TABLE = True  # results are stored as table files
+RESULT_TABLE = True  # merge all results to on table
+RECREATE = False  # recalc spec even if it is already in the results table
+TABLE_TYPE = "xlsx"  # type of table data, use 'xlsx' for an excel-file or 'csv' for a csv-file
 
 from autochem.spectra.nmr.reader import read_nmr, NMRReadError
-from autochem.utils.corrections import norm_data, shift_data, scale_data
+from autochem.utils.corrections import norm_data
 from autochem.utils.signals.peak_detection import find_peaks, get_reference_peak, PeakNotFoundError, peak_integration, \
     merge_peaks_data, cut_peaks_data, factorize_peak_data, manual_peak_finder
 from autochem.spectra.nmr.utils import zoom
 from autochem.utils.corrections.shift import get_signal_shift
+from autochem.utils.corrections.baseline import rubberband_correction, median_correction
 
 logger = logging.getLogger("autochem")
 logger.setLevel("DEBUG")
-MANUAL_PEAKS  = np.array(MANUAL_PEAKS)
+
 EXPECTED_PEAKS = np.array(EXPECTED_PEAKS)
 assert REFERENCE_PEAK in EXPECTED_PEAKS
 assert len(MANUAL_PEAK_RANGES) == len(MANUAL_PEAKS)
@@ -107,7 +100,6 @@ def plot_nmr(data, ppm, path=None, label=None, show=False,xlim=None):
 
 
 def work_spec(data, data_dict, path):
-    processing=[]
     ppm_scale = data_dict["ppm_scale"]
 
     # plot raw data if wanted
@@ -115,108 +107,29 @@ def work_spec(data, data_dict, path):
     if PLOT_INTERMEDIATES:
         image_number += 1
         plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_raw_data.png"), label="raw_data",
-                 show=SHOW_PLOTS)
+                 show=SHOW_PLOTS,xlim=FIXED_SCALE)
 
     # First norm data between 0 and 1
     data, normata = norm_data(data)
-    processing.append({
-        "type":"linear norm",
-        "parameter":normata,
-        "comment":"norm between 0 and 1"}
-    )
-    print(data.min(),data.max())
+    data, bl_data_rb = median_correction(data)
+    data /= data.max()
+
     if PLOT_INTERMEDIATES:
         image_number += 1
-        plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_norm1.png"), label="norm1",
-                 show=SHOW_PLOTS)
-
-    data, normata = shift_data(data,np.median(data))
-    processing.append({
-        "type":"linear norm",
-        "parameter":normata,
-        "comment":"median to baseline"}
-    )
-    if PLOT_INTERMEDIATES:
-        image_number += 1
-        plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_norm2.png"), label="norm2",
-                 show=SHOW_PLOTS)
-
-    data, normata = scale_data(data,1/data.max())
-    processing.append({
-        "type":"linear norm",
-        "parameter":normata,
-        "comment":"maximum back to 1"}
-    )
-    if PLOT_INTERMEDIATES:
-        image_number += 1
-        plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_norm3.png"), label="norm3",
-                 show=SHOW_PLOTS)
-
+        plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_normed_data.png"), label="normed_data",
+                 show=SHOW_PLOTS,xlim=FIXED_SCALE)
 
     # initial peak finder
     peaks, peak_data = manual_peak_finder(y=data, x=ppm_scale, peak_ranges=MANUAL_PEAK_RANGES)
-    peaks, peak_data = find_peaks(y=data, x=ppm_scale,min_peak_height=MIN_PEAK_HEIGHT,
-                                  rel_height=PEAK_BOARDER_RELATIVE_HEIGHT,
-                                  min_distance=MIN_PEAK_DISTANCE,
-                                  max_width=MAX_PEAK_WIDTH,
-                                  rel_prominence=0.1,
-                                  )
 
     # shift ppm scale to match expectations
     _m, _c = get_signal_shift(ppm_scale[peaks], EXPECTED_PEAKS, allow_stretch=ALLOW_PPM_STRETCH)
-    original_ppm_scale=ppm_scale
     ppm_scale = ppm_scale * _m + _c
-    processing.append({
-        "type":"ppm shift",
-        "parameter":[_m,_c],
-        "comment":"shift ppm scale to best match expected peaks"}
-    )
+
     if PLOT_INTERMEDIATES:
         image_number += 1
         plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_shifted_data.png"),
-                 label="shifted_data", show=SHOW_PLOTS)
-
-
-
-    peaks, peak_data = find_peaks(y=data, x=ppm_scale,min_peak_height=MIN_PEAK_HEIGHT,
-                                  rel_height=PEAK_BOARDER_RELATIVE_HEIGHT,
-                                  min_distance=MIN_PEAK_DISTANCE,
-                                  max_width=MAX_PEAK_WIDTH,
-                                  rel_prominence=0.1,
-                                  )
-    detected_peak_ranges=[]
-    for mpr in MANUAL_PEAK_RANGES:
-        peaks_in_range=(ppm_scale[peaks]>=mpr[0]) & (ppm_scale[peaks]<=mpr[1])
-        if peaks_in_range.sum()==0:
-            #detected_peak_ranges.append(None)
-            continue
-        if peaks_in_range.sum()>1:
-            #filer by maximum size
-            peaks_in_range[peaks_in_range] =  peak_data["peak_heights"][peaks_in_range] == peak_data["peak_heights"][peaks_in_range].max()
-
-        if peaks_in_range.sum()>1:
-            #filer by order
-            fist=peaks_in_range.argmax()
-            peaks_in_range[:] = False
-            peaks_in_range[fist] = True
-
-        detected_peak_ranges.append([
-          #  max(
-          #      mpr[0],
-                ppm_scale[peak_data["peak_left_border"][peaks_in_range].min()],
-          #  ),
-        #    min(
-         #       mpr[1],
-                ppm_scale[peak_data["peak_right_border"][peaks_in_range].max()],
-        #    ),
-        ])
-
-    detected_peak_ranges=np.array(detected_peak_ranges)
-    peaks, peak_data = manual_peak_finder(y=data, x=ppm_scale,
-                                          peak_ranges=[pr for pr in detected_peak_ranges if pr is not None],
-                                          rel_height=PEAK_BOARDER_RELATIVE_HEIGHT,
-                                          )
-
+                 label="shifted_data", show=SHOW_PLOTS,xlim=FIXED_SCALE)
 
     # integrate_peaks
     peaks, peak_data = peak_integration(x=ppm_scale,
@@ -233,17 +146,7 @@ def work_spec(data, data_dict, path):
 
     scaler = REFERENCE_PEAK_AREA / peak_data["integrals"][pidx]
     peak_data = factorize_peak_data(peak_data, scale_factor=scaler)
-    data, normata = scale_data(data,scaler)
-    processing.append({
-        "type":"linear norm",
-        "parameter":normata,
-        "comment":"scale for integral to match ref peak"}
-    )
-    if PLOT_INTERMEDIATES:
-        image_number += 1
-        plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_ref_scaled.png"),
-                 label="ref scaled", show=SHOW_PLOTS,xlim=FIXED_SCALE)
-
+    data *= scaler
 
     # zoom to relevant areas
     ppm_min = ppm_scale[peak_data["peak_left_border"].min()]
@@ -260,19 +163,8 @@ def work_spec(data, data_dict, path):
         ppm_max,
     )
 
-    processing.append({
-        "type":"zoom",
-        "parameter":zoom_indices,
-        "comment":"to cut of unwanted/empty regions"}
-    )
-    if PLOT_INTERMEDIATES:
-        image_number += 1
-        plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_zoomed.png"),
-                 label="zoomed", show=SHOW_PLOTS)
-
-    print(peaks.shape,peak_data["peak_heights"].shape)
     peaks, peak_data = cut_peaks_data(peaks, peak_data, *zoom_indices)
-    print(peaks.shape,peak_data["peak_heights"].shape)
+
     # recreate integration data
     peaks, peak_data = peak_integration(x=ppm_scale,
                                         y=data,
@@ -280,6 +172,10 @@ def work_spec(data, data_dict, path):
                                         peak_data=peak_data,
                                         )
 
+    if PLOT_INTERMEDIATES:
+        image_number += 1
+        plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_zoomed_data.png"), label="zoomed_data",
+                 show=SHOW_PLOTS,xlim=FIXED_SCALE)
 
     # finishing up
     if PLOT_RESULT:
@@ -290,15 +186,6 @@ def work_spec(data, data_dict, path):
 
         for i in range(len(SPECIES_PEAKS_NAMES)):
             target_peaks=SPECIES_PEAKS[i]
-            found=True
-            for tp in target_peaks:
-                if detected_peak_ranges.size==0 or ((detected_peak_ranges[:,0]<=tp) & (detected_peak_ranges[:,1]>=tp)).sum()==0:
-                    #tp not found
-                    found=False
-                    break
-            if not found:
-                continue
-
 
             peak_positions=[]
             for p in target_peaks:
@@ -314,8 +201,6 @@ def work_spec(data, data_dict, path):
                 [center_x]*len(target_peaks)+list(ppm_scale[peaks][peak_positions]),
                 [center_y]*len(target_peaks)+list(peak_data["peak_heights"][peak_positions]/2),
                 "k",alpha=0.3,linewidth=1)
-
-
         plt.plot(ppm_scale[peak_data["peak_maximum"]], peak_data["peak_heights"], "+", label="peaks maximum")
         plt.plot(ppm_scale[peak_data["peak_mean"]], peak_data["peak_heights"], "+", label="peaks mean")
 
@@ -328,7 +213,7 @@ def work_spec(data, data_dict, path):
         for i in range(peaks.shape[0]):
             lb = peak_data['peak_left_border'][i]
             rb = peak_data['peak_right_border'][i]
-            plt.fill_between(x=ppm_scale[lb:rb], y1=data[lb:rb], alpha=0.5, label=f"{ppm_scale[peaks[i]]:.2f} ppm")
+            plt.fill_between(x=ppm_scale[lb:rb], y1=data[lb:rb], alpha=0.5, label=f"{ppm_scale[peaks[i]]} ppm")
             incum[lb:rb] = True
             cumi[~incum] = np.nan
         plt.plot(ppm_scale, cumi, "g", label="integral")
@@ -350,7 +235,7 @@ def work_spec(data, data_dict, path):
         "left_border": ppm_scale[peak_data['peak_left_border']],
         "right_border": ppm_scale[peak_data['peak_right_border']],
         "area": peak_data["integrals"],
-        "est nucl.": np.round(peak_data["integrals"]).astype(int),
+        "est nucl.": np.round(peak_data["integrals"]).astype(int)
     })
 
     try:
@@ -360,8 +245,6 @@ def work_spec(data, data_dict, path):
 
     df["Sample"] = data_dict['acqu'].get('Sample', "sample_name")
 
-    with open(os.path.join(path, "processing_flow.txt"),"w+") as f:
-        json.dump(processing,f,indent=4)
     if CREATE_TABLE:
         if TABLE_TYPE == "csv":
             df.to_csv(os.path.join(path, "signals_ac.csv"), index=False)
@@ -374,6 +257,7 @@ def work_spec(data, data_dict, path):
 
 def main():
     results_df = pd.DataFrame()
+    results_df.index.get_level_values
     if RESULT_TABLE:
         res_file = os.path.join(FOLDER, "results.xlsx")
         try:
@@ -383,14 +267,19 @@ def main():
     change = False
 
     def _sp(path):
-        #if not os.path.basename(path).endswith("0"):
-        #    return True
         return "path" in results_df.index.names and path in results_df.index.get_level_values(
             results_df.index.names.index('path')) and not RECREATE
 
+    i=0
     for data, data_dict in find_nmrs(FOLDER, skip_path=_sp):
+        if i >0:
+            i-=1
+            #continue
+        i=10
         path = data_dict["path"]
-
+        if "path" in results_df.index.names and path in results_df.index.get_level_values(
+                results_df.index.names.index('path')) and not RECREATE:
+            continue
         sdf = work_spec(data, data_dict, path)
         sdf["path"] = path
         sdf["peak"] = sdf.index.values + 1
@@ -400,9 +289,7 @@ def main():
         results_df = pd.concat([results_df, sdf[~sdf.index.isin(results_df.index)]])
         results_df.update(sdf)
         change = True
-
-
-    results_df.sort_values("startTime",inplace=True)
+        return
 
     if change and RESULT_TABLE:
         try:
@@ -413,19 +300,22 @@ def main():
         print("no changes detected")
 
     times = pd.to_datetime(results_df.index.get_level_values('startTime').unique()).values
-    apd = np.zeros((len(times),len(MANUAL_PEAKS)))*np.nan
-    for i,t in enumerate(times):
-        #_apd = []
+    apd = []
+    for t in times:
+        _apd = []
         d = results_df.loc[results_df.index.get_level_values('startTime') == t]
+        for ex in MANUAL_PEAKS:
+            _apd.append(
+                d["area"].values[np.abs(d["ppm"] - ex).argmin()]
+            )
+        apd.append(_apd)
+    # print(_apd)
+    # break
 
-        dist_matrix = np.abs( np.subtract.outer(MANUAL_PEAKS,d["ppm"].values))
+    apd = np.array(apd)
 
-        while not np.isnan(dist_matrix).all():
-            minidx = np.unravel_index(np.nanargmin(dist_matrix), dist_matrix.shape)
-            apd[i,minidx[0]]=d["area"].values[minidx[1]]
-            dist_matrix[minidx[0],:]=np.nan
-            dist_matrix[:,minidx[1]]=np.nan
-
+    def _f(x, k, l, c):
+        return k * np.exp(-l * x) + c
 
     tdiff = times
     tdiff = tdiff - tdiff.min()
@@ -438,36 +328,24 @@ def main():
     plt.title("NMR signal area over time")
     plt.xlabel("t [s]")
     plt.ylabel("rel. area")
-    plt.savefig(os.path.join(FOLDER, "nmr_area_over_time.png"),dpi=300)
     plt.show()
-    plt.close()
-
-    def _f(x, k, l, c):
-        return k * np.exp(-l * x) + c
-
-    
-
-    #for i in range(len(SPECIES_PEAKS)):
-    #    name=SPECIES_PEAKS_NAMES[i]
-    #    peaks=SPECIES_PEAKS[i]
-    #    pp=[]
-    #    for p in peaks:
-    #        pp.append(np.abs(MANUAL_PEAKS-p).argmin())
 
 
-    #c_ome_eg=np.ones_like(apd[:,0])*apd[0,0]/SPECIES_PEAK_AREAS[0]
-    c_ome_eg=apd[:,0]/SPECIES_PEAK_AREAS[0]
+    for i in range(len(SPECIES_PEAKS)):
+        name=SPECIES_PEAKS_NAMES[i]
+        peaks=SPECIES_PEAKS[i]
+        pp=[]
+        for p in peaks:
+            pp.append(np.abs(MANUAL_PEAKS-p).argmin())
+
+
+        print(name)
+
+    c_ome_eg=np.ones_like(apd[:,0])*apd[0,0]/SPECIES_PEAK_AREAS[0]
     c_ome_1=apd[:,1]/SPECIES_PEAK_AREAS[1]
     c_ome_2=apd[:,2]/SPECIES_PEAK_AREAS[2]
     c_ome_3=apd[:,3]/SPECIES_PEAK_AREAS[3]
     c_triox=apd[:,4]/SPECIES_PEAK_AREAS[4]
-    f=c_ome_eg[0]/(c_ome_eg[0]+c_triox[0])
-    c_ome_eg*=f
-    c_ome_1*=f
-    c_ome_2*=f
-    c_ome_3*=f
-    c_triox*=f
-
     plt.plot(tdiff,c_ome_eg,".",label=SPECIES_PEAKS_NAMES[0])
     plt.plot(tdiff,c_ome_1,".",label=SPECIES_PEAKS_NAMES[1])
     plt.plot(tdiff,c_ome_2,".",label=SPECIES_PEAKS_NAMES[2])
@@ -477,7 +355,6 @@ def main():
     plt.legend()
     plt.show()
     plt.close()
-
 
 
 if __name__ == '__main__':

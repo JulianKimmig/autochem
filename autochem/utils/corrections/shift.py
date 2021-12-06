@@ -31,11 +31,10 @@ def get_signal_shift(peaks,expected_peaks,allow_stretch=False):
         np.array([1, -peaks.min()+expected_peaks.min()]),
         np.array([1, -peaks.max()+expected_peaks.max()])
     ]
-    r=np.array([0])
+    r=[]
     for b in bs:
-        r = np.array([mxpc(b,peaks,expected_peaks)])
-
-
+        r.append([mxpc(b,peaks,expected_peaks)])
+    r = np.array(r)
     min = minimize(mxpc,
                    bs[r.argmin()],
                    (peaks,expected_peaks),

@@ -2,7 +2,7 @@ import json
 
 #FOLDER = "C:\\Users\\be34gof\\Downloads\\TSU-141-E"
 FOLDER = "C:\\Users\\be34gof\\Downloads\\25_11_2021"
-MIN_PEAK_HEIGHT = 0.01  # minimum peak height relative to the largest peak
+MIN_PEAK_HEIGHT = 0.05  # minimum peak height relative to the largest peak
 PEAK_BOARDER_RELATIVE_HEIGHT = 0.01  # peak height relative to the peak maximum which sets the integration limits
 MAX_PEAK_WIDTH = 1  # maximum peak with, to limit very small and broad peaks
 MIN_PEAK_DISTANCE = 0.1  # minimum peak distance, clsoer peaks are counted as one
@@ -14,24 +14,24 @@ EXPECTED_PEAKS = [2.7, 3.9, 4.5]  # list of expected peaks for shift correction
 MANUAL_PEAKS = [2.7, 3.9, 4.12, 4.3, 4.5]  # list of expected peaks for shift correction
 MANUAL_PEAK_RANGES = [
     [2.40, 3.3],
-    [3.8, 4.0],
+    [3.4, 4.0],
     [4.0, 4.15],
-    [4.15, 4.40],
-    [4.40, 4.78],
+    [4.15, 4.36],
+    [4.37, 4.78],
 ]
 
-SPECIES_PEAKS = [[2.7], [3.9], [4.12], [4.3], [4.5]]
-SPECIES_PEAK_AREAS = [[6], [2], [4], [6], [6]]
-SPECIES_PEAKS_NAMES = ["OME-CH3","OME-1","OME-2","OME-3+","Trioxane"]
+SPECIES_PEAKS = [[3.9], [4.12], [4.3], [4.5],[2.7]]
+SPECIES_PEAK_AREAS = [[2], [4], [6], [6],[6]]
+SPECIES_PEAKS_NAMES = ["OME-1","OME-2","OME-3+","Trioxane","OME-CH3"]
 
 # REFERENCE_PEAK=None
 REFERENCE_PEAK = 2.7  # reference peak used as integration standart
 REFERENCE_PEAK_AREA = 6  # area of the reference peak
 REFERENCE_PEAK_WINDOW = 0.4  # maximum derivation from the reference peak
 
-PLOT_INTERMEDIATES = True  # plot all intermediate steps
+PLOT_INTERMEDIATES = False  # plot all intermediate steps
 PLOT_RESULT = True  # plot result
-SHOW_PLOTS = True  # live show plots, normally False
+SHOW_PLOTS = False  # live show plots, normally False
 
 CREATE_TABLE = True  # results are stored as table files
 RESULT_TABLE = True  # merge all results to on table
@@ -75,6 +75,10 @@ EXPECTED_PEAKS = np.array(EXPECTED_PEAKS)
 assert REFERENCE_PEAK in EXPECTED_PEAKS
 assert len(MANUAL_PEAK_RANGES) == len(MANUAL_PEAKS)
 assert len(SPECIES_PEAKS_NAMES) == len(SPECIES_PEAKS)
+
+SPECIES_PEAKS = np.array(SPECIES_PEAKS)
+SPECIES_PEAK_AREAS = np.array(SPECIES_PEAK_AREAS)
+assert SPECIES_PEAK_AREAS.shape == SPECIES_PEAKS.shape
 
 def find_nmrs(root, path_only=False, skip_path=None):
     for path, folder, files in os.walk(root):
@@ -124,7 +128,6 @@ def work_spec(data, data_dict, path):
         "parameter":normata,
         "comment":"norm between 0 and 1"}
     )
-    print(data.min(),data.max())
     if PLOT_INTERMEDIATES:
         image_number += 1
         plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_norm1.png"), label="norm1",
@@ -182,8 +185,22 @@ def work_spec(data, data_dict, path):
                                   rel_height=PEAK_BOARDER_RELATIVE_HEIGHT,
                                   min_distance=MIN_PEAK_DISTANCE,
                                   max_width=MAX_PEAK_WIDTH,
-                                  rel_prominence=0.1,
+                                  rel_prominence=0.5,
                                   )
+    if PLOT_INTERMEDIATES:
+        image_number += 1
+        plt.plot(ppm_scale,data)
+        for i in range(peaks.shape[0]):
+            lb = peak_data['peak_left_border'][i]
+            rb = peak_data['peak_right_border'][i]
+            plt.fill_between(x=ppm_scale[lb:rb], y1=data[lb:rb], alpha=0.5, label=f"{ppm_scale[peaks[i]]:.2f} ppm")
+        plt.xlim(*FIXED_SCALE)
+        plt.legend()
+        plt.savefig(os.path.join(path, f"img_{image_number}_first_peaks.png"), dpi=300)
+        if SHOW_PLOTS:
+            plt.show()
+        plt.close()
+
     detected_peak_ranges=[]
     for mpr in MANUAL_PEAK_RANGES:
         peaks_in_range=(ppm_scale[peaks]>=mpr[0]) & (ppm_scale[peaks]<=mpr[1])
@@ -270,9 +287,7 @@ def work_spec(data, data_dict, path):
         plot_nmr(data, ppm_scale, path=os.path.join(path, f"img_{image_number}_zoomed.png"),
                  label="zoomed", show=SHOW_PLOTS)
 
-    print(peaks.shape,peak_data["peak_heights"].shape)
     peaks, peak_data = cut_peaks_data(peaks, peak_data, *zoom_indices)
-    print(peaks.shape,peak_data["peak_heights"].shape)
     # recreate integration data
     peaks, peak_data = peak_integration(x=ppm_scale,
                                         y=data,
@@ -286,7 +301,7 @@ def work_spec(data, data_dict, path):
         image_number += 1
 
         plt.plot(ppm_scale, data, linewidth=1)
-        plt.plot(ppm_scale[peaks], peak_data["peak_heights"], "+", label="peaks median")
+
 
         for i in range(len(SPECIES_PEAKS_NAMES)):
             target_peaks=SPECIES_PEAKS[i]
@@ -315,7 +330,7 @@ def work_spec(data, data_dict, path):
                 [center_y]*len(target_peaks)+list(peak_data["peak_heights"][peak_positions]/2),
                 "k",alpha=0.3,linewidth=1)
 
-
+        plt.plot(ppm_scale[peak_data["peak_median"]], peak_data["peak_heights"], "+", label="peaks median")
         plt.plot(ppm_scale[peak_data["peak_maximum"]], peak_data["peak_heights"], "+", label="peaks maximum")
         plt.plot(ppm_scale[peak_data["peak_mean"]], peak_data["peak_heights"], "+", label="peaks mean")
 
@@ -384,7 +399,7 @@ def main():
 
     def _sp(path):
         #if not os.path.basename(path).endswith("0"):
-        #    return True
+         #   return True
         return "path" in results_df.index.names and path in results_df.index.get_level_values(
             results_df.index.names.index('path')) and not RECREATE
 
@@ -402,6 +417,7 @@ def main():
         change = True
 
 
+
     results_df.sort_values("startTime",inplace=True)
 
     if change and RESULT_TABLE:
@@ -413,12 +429,12 @@ def main():
         print("no changes detected")
 
     times = pd.to_datetime(results_df.index.get_level_values('startTime').unique()).values
-    apd = np.zeros((len(times),len(MANUAL_PEAKS)))*np.nan
+    apd = np.zeros((len(times),SPECIES_PEAKS.size))*np.nan
     for i,t in enumerate(times):
         #_apd = []
         d = results_df.loc[results_df.index.get_level_values('startTime') == t]
 
-        dist_matrix = np.abs( np.subtract.outer(MANUAL_PEAKS,d["ppm"].values))
+        dist_matrix = np.abs( np.subtract.outer(SPECIES_PEAKS.flatten(),d["ppm"].values))
 
         while not np.isnan(dist_matrix).all():
             minidx = np.unravel_index(np.nanargmin(dist_matrix), dist_matrix.shape)
@@ -427,11 +443,11 @@ def main():
             dist_matrix[:,minidx[1]]=np.nan
 
 
-    tdiff = times
-    tdiff = tdiff - tdiff.min()
-    tdiff = tdiff / np.timedelta64(1, 's')
-    for i in range(len(MANUAL_PEAKS)):
-        plt.plot(tdiff, apd[:, i], ".", label=f"{MANUAL_PEAKS[i]} ppm")
+    tdiffa = times
+    tdiffa = tdiffa - tdiffa.min()
+    tdiffa = tdiffa / np.timedelta64(1, 's')
+    for i in range(len(SPECIES_PEAKS.flatten())):
+        plt.plot(tdiffa, apd[:, i], ".", label=f"{SPECIES_PEAKS.flatten()[i]} ppm")
         # opt_parms, parm_cov = curve_fit(_f,tdiff,apd[:,i])
         # plt.plot(tdiff,_f(tdiff,*opt_parms),label=str(EXPECTED_PEAKS[i]))
     plt.legend()
@@ -445,7 +461,7 @@ def main():
     def _f(x, k, l, c):
         return k * np.exp(-l * x) + c
 
-    
+
 
     #for i in range(len(SPECIES_PEAKS)):
     #    name=SPECIES_PEAKS_NAMES[i]
@@ -456,29 +472,168 @@ def main():
 
 
     #c_ome_eg=np.ones_like(apd[:,0])*apd[0,0]/SPECIES_PEAK_AREAS[0]
-    c_ome_eg=apd[:,0]/SPECIES_PEAK_AREAS[0]
-    c_ome_1=apd[:,1]/SPECIES_PEAK_AREAS[1]
-    c_ome_2=apd[:,2]/SPECIES_PEAK_AREAS[2]
-    c_ome_3=apd[:,3]/SPECIES_PEAK_AREAS[3]
-    c_triox=apd[:,4]/SPECIES_PEAK_AREAS[4]
-    f=c_ome_eg[0]/(c_ome_eg[0]+c_triox[0])
-    c_ome_eg*=f
-    c_ome_1*=f
-    c_ome_2*=f
-    c_ome_3*=f
-    c_triox*=f
+    #c_ome_eg=apd[:,0]/SPECIES_PEAK_AREAS[0]
+    #c_ome_1=apd[:,1]/SPECIES_PEAK_AREAS[1]
+    #c_ome_2=apd[:,2]/SPECIES_PEAK_AREAS[2]
+    #c_ome_3=apd[:,3]/SPECIES_PEAK_AREAS[3]
+    #c_triox=apd[:,4]/SPECIES_PEAK_AREAS[4]
+    csa=apd/SPECIES_PEAK_AREAS.flatten()
+    #f=c_ome_eg[0]/(c_ome_eg[0]+c_triox[0])
+    #c_ome_eg*=f
+    #c_ome_1*=f
+    #c_ome_2*=f
+    #c_ome_3*=f
+    #c_triox*=f
 
-    plt.plot(tdiff,c_ome_eg,".",label=SPECIES_PEAKS_NAMES[0])
-    plt.plot(tdiff,c_ome_1,".",label=SPECIES_PEAKS_NAMES[1])
-    plt.plot(tdiff,c_ome_2,".",label=SPECIES_PEAKS_NAMES[2])
-    plt.plot(tdiff,c_ome_3,".",label=SPECIES_PEAKS_NAMES[3])
-    plt.plot(tdiff,c_triox,".",label=SPECIES_PEAKS_NAMES[4])
-    plt.plot(tdiff,c_ome_1+c_ome_2+c_ome_3,".",label="sum OME")
+    #for i in range(cs.shape[1]):
+    #    plt.plot(tdiff,cs[:,i],".",label=SPECIES_PEAKS_NAMES[i])
+    #plt.plot(tdiff,c_ome_1,".",label=SPECIES_PEAKS_NAMES[1])
+    #plt.plot(tdiff,c_ome_2,".",label=SPECIES_PEAKS_NAMES[2])
+    #plt.plot(tdiff,c_ome_3,".",label=SPECIES_PEAKS_NAMES[3])
+    #plt.plot(tdiff,c_triox,".",label=SPECIES_PEAKS_NAMES[4])
+    #plt.plot(tdiff,c_ome_1+c_ome_2+c_ome_3,".",label="sum OME")
+    #plt.legend()
+    #plt.savefig(os.path.join(FOLDER, "species_conc.png"),dpi=300)
+    #plt.show()
+    #plt.close()
+    return
+    def ffill(arr):
+        arr=arr.copy()
+        mask = np.isnan(arr)
+        idx = np.where(~mask, np.arange(mask.shape[0]), 0)
+        np.maximum.accumulate(idx, axis=0, out=idx)
+        arr = arr[idx]
+        return arr
+
+    def moving_average(a, n=3) :
+        n=min(n,a.shape[0])
+        a=a.copy()
+        ret = np.cumsum(np.nan_to_num(a), dtype=float,axis=0)
+        ret[n:] = ret[n:] - ret[:-n]
+        ret[n - 1:]/=n
+        if n>1:
+            ret[:n - 1]=(ret[:n - 1].T/np.arange(1,n)).T
+        return ret
+
+    os.makedirs(os.path.join(FOLDER,"timelaps",),exist_ok=True)
+    for ti in range(2,csa.shape[0],1):
+        cs=csa[:ti]
+        tdiff=tdiffa[:ti]
+        impath=os.path.join(FOLDER,"timelaps", f"{ti:06d}.png")
+        if os.path.exists(impath):
+            continue
+        mvg_avg = moving_average(cs,30)
+
+        mvg_avg_diff = np.abs(cs-mvg_avg)
+        mvg_avg_diff_mvg_avg = moving_average(mvg_avg_diff,10)
+        th=1
+        diff_mvg_avg_diff_mvg_avg = np.abs(mvg_avg_diff_mvg_avg-mvg_avg_diff)/mvg_avg_diff_mvg_avg
+
+        outlier=diff_mvg_avg_diff_mvg_avg>th
+
+        n_cs=cs.copy()
+        n_cs[outlier]=np.nan
+
+        if n_cs.ndim>1:
+            for i in range(n_cs.shape[1]):
+                n_cs[:,i]=ffill(n_cs[:,i])
+        else:
+            n_cs=ffill(n_cs)
+
+        n_mvg_avg = moving_average(n_cs,30)
+
+        ep_th=0.003
+        lp_th=0.0012
+        grad = np.abs(np.gradient(n_mvg_avg,axis=0))
+        avg_grad = moving_average(grad,30)
+
+        entry_point = avg_grad.mean(1)
+        ep_idx=(entry_point>ep_th).argmax()
+
+        lp_idx=(entry_point[ep_idx:]>lp_th).argmin()+ep_idx
+
+
+        f, (ax1, ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [4,1]},figsize=(10,10))
+        for i in range(n_cs.shape[1]):
+            ax1.plot(tdiff,n_cs[:,i],".",label=SPECIES_PEAKS_NAMES[i],alpha=0.6)
+        for i in range(n_cs.shape[1]):
+            ax1.plot(tdiff,n_mvg_avg[:,i],label=SPECIES_PEAKS_NAMES[i]+" mean")
+
+        ax2.plot(tdiff,entry_point,label="mean gradient")
+
+        if ep_idx>0:
+            ax2.vlines(tdiff[ep_idx],0,entry_point.max(),color="green",label="rxn start")
+
+
+            if lp_idx>ep_idx:
+                ax2.vlines(tdiff[lp_idx],0,entry_point.max(),color="red",label="rxn end")
+
+        ax1.legend(loc='upper right')
+        ax2.legend()
+        plt.savefig(impath,dpi=200)
+        #plt.show()
+        plt.close()
+
+    images=[]
+    import imageio
+    for f in sorted(os.listdir(os.path.join(FOLDER,"timelaps"))):
+        images.append(imageio.imread(os.path.join(FOLDER,"timelaps",f)))
+    imageio.mimsave(os.path.join(FOLDER,"timelaps.gif"), images)
+
+    #moving_average(np.arange(100).reshape(25,4),5)
+    #popt,pcov = curve_fit(poly, tdiff, c_ome_eg,bounds=([0],[10]))
+
+   #for i in range(cs.shape[1]):
+   #     plt.plot(tdiff,cs[:,i],".",label=SPECIES_PEAKS_NAMES[i],alpha=0.6)
+   # for i in range(cs.shape[1]):
+   #     plt.plot(tdiff,mvg_avg[:,i],label=SPECIES_PEAKS_NAMES[i])
+   # plt.legend()
+   # plt.show()
+   # plt.close()
+
+
+    #for i in range(cs.shape[1]):
+    #    plt.plot(tdiff,mvg_avg_diff[:,i],label=SPECIES_PEAKS_NAMES[i])
+    #    plt.plot(tdiff,mvg_avg_diff_mvg_avg[:,i],label=SPECIES_PEAKS_NAMES[i])
+
+    #plt.legend()
+    #plt.show()
+    #plt.close()
+
+
+    #for i in range(cs.shape[1]):
+    #    plt.plot(tdiff,diff_mvg_avg_diff_mvg_avg[:,i],label=SPECIES_PEAKS_NAMES[i])
+    #plt.hlines(th,xmin=tdiff.min(),xmax=tdiff.max())
+
+    #plt.legend()
+    #plt.show()
+    #plt.close()
+
+    return
+    for i in range(n_cs.shape[1]):
+        plt.plot(tdiff,n_cs[:,i],".",label=SPECIES_PEAKS_NAMES[i],alpha=0.6)
+    for i in range(n_cs.shape[1]):
+        plt.plot(tdiff,n_mvg_avg[:,i],label=SPECIES_PEAKS_NAMES[i])
     plt.legend()
     plt.show()
     plt.close()
 
 
+    for i in range(n_cs.shape[1]):
+        #plt.plot(tdiff,grad[:,i],label=SPECIES_PEAKS_NAMES[i])
+        plt.plot(tdiff,avg_grad[:,i],label=SPECIES_PEAKS_NAMES[i])
+
+    plt.plot(tdiff,entry_point,label="mean")
+
+    plt.vlines(tdiff[ep_idx],0,1)
+
+
+    if lp_idx>0:
+        plt.vlines(tdiff[lp_idx],0,1)
+
+    plt.legend()
+    plt.show()
+    plt.close()
 
 if __name__ == '__main__':
     main()

@@ -6,7 +6,7 @@ from scipy import signal
 PEAK_INDEX_VALUES=['left_bases', 'right_bases', 'left_ips', 'right_ips', "peak_left_border", "peak_right_border",
                       "peak_maximum", "peak_mean", "peak_median"]
 
-PEAK_SCALE_DEPENDING_VALUES=['peak_heights', 'prominences', 'width_heights', 'integrals','cum_integral']
+PEAK_SCALE_DEPENDING_VALUES=['peak_heights', 'prominences', 'width_heights', 'integrals']
 
 def cut_peaks_data(peaks,peak_data,idx1,idx2):
     idx1,idx2 = min(idx1,idx2),max(idx1,idx2)
@@ -18,6 +18,9 @@ def cut_peaks_data(peaks,peak_data,idx1,idx2):
         if ys in peak_data:
             peak_data[ys] = peak_data[ys][peak_mask]- idx1
 
+    for ys in PEAK_SCALE_DEPENDING_VALUES:
+        if ys in peak_data:
+            peak_data[ys] = peak_data[ys][peak_mask]
 
 
     return peaks,peak_data
@@ -130,10 +133,19 @@ def manual_peak_finder(y,x,peak_ranges,**kwargs):
 
     for r in peak_ranges:
         in_ppm=(x>=r[0]) & (x<=r[1])
-        p,d = find_peaks(y[in_ppm],
-                         x[in_ppm],
-                         min_distance=r[1]-r[0],
-                         **kwargs)
+        try:
+            p,d = find_peaks(y[in_ppm],
+                             x[in_ppm],
+                             min_distance=r[1]-r[0],
+                             **kwargs)
+        except IndexError:
+            _y=y[in_ppm].copy()
+            _y[int(len(_y)/2)-1]= _y[int(len(_y)/2)]/2
+            _y[int(len(_y)/2)+1]= _y[int(len(_y)/2)]/2
+            p,d = find_peaks(_y,
+                             x[in_ppm],
+                             min_distance=r[1]-r[0],
+                             **kwargs)
         d["peak_left_border"][:]=0
         d["peak_right_border"][:]=in_ppm.sum()-1
         if peaks is not None:
