@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
+import cv2
 
 IMAGE="C:\\Users\\be34gof\\Downloads\\20211206\\PE_226-23h_06.tif"
 
@@ -9,13 +10,28 @@ IMAGE="C:\\Users\\be34gof\\Downloads\\20211206\\PE_226-23h_06.tif"
 im = Image.open(IMAGE)
 imarray = np.array(im)
 footer_idx=(imarray.mean(1)[int(imarray.shape[0]/2):]>200).argmax()+int(imarray.shape[0]/2)
+
+
 oimg = imarray[:footer_idx]
 img=oimg - oimg.min()
 img=img/img.max()
+grayImage = cv2.cvtColor((img*255).astype('uint8'), cv2.COLOR_GRAY2BGR)
+
+
+circles = cv2.HoughCircles((img*255).astype('uint8'), cv2.HOUGH_GRADIENT, 1, 20,
+                           param1=110, param2=20, minRadius=4, maxRadius=30
+                           )
 plt.imshow(img)
-plt.colorbar()
+
+if circles is not None:
+    for x, y, r in sorted(circles[0],key=lambda d:d[2]):
+        c = plt.Circle((x, y), r, fill=False, lw=2, ec='C1')
+        c2 = plt.Circle((x, y), r, fill=True, lw=0, ec='C1')
+        plt.gca().add_patch(c)
+        plt.gca().add_patch(c2)
 plt.show()
 plt.close()
+
 
 contourimage=img.copy()
 for x in range(img.shape[0]):

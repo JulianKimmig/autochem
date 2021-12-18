@@ -3,3 +3,8 @@
 /build
 /dist!
 /cmd.spec
+
+/dist
+
+__pycache__/
+.ipynb_checkpoints/

@@ -417,7 +417,7 @@ def main():
         change = True
 
 
-
+    print(results_df)
     results_df.sort_values("startTime",inplace=True)
 
     if change and RESULT_TABLE:
@@ -496,7 +496,7 @@ def main():
     #plt.savefig(os.path.join(FOLDER, "species_conc.png"),dpi=300)
     #plt.show()
     #plt.close()
-    return
+
     def ffill(arr):
         arr=arr.copy()
         mask = np.isnan(arr)
@@ -574,6 +574,7 @@ def main():
         #plt.show()
         plt.close()
 
+    return
     images=[]
     import imageio
     for f in sorted(os.listdir(os.path.join(FOLDER,"timelaps"))):
