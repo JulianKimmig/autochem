@@ -175,12 +175,24 @@ def find_peaks(
         rel_prominence=0,
         center="max",
         max_width=np.inf,
+        peak_ranges=None,
         **kwargs
 ):
+    if peak_ranges is not None:
+        peak_ranges=np.array(peak_ranges)
+        assert peak_ranges.shape[1]==2
+        peak_ranges=peak_ranges[peak_ranges[:, 0].argsort()]
+        assert not np.any(np.diff(peak_ranges.flatten())<0),"overlap in peak ranges"
+
     if x is not None:
         points_per_x = len(x) / (x.max() - x.min())
         min_distance = points_per_x * min_distance
         max_width = points_per_x * max_width
+
+    if x is not None and peak_ranges is not None:
+        us = np.abs(np.subtract.outer(peak_ranges,x))
+        peak_ranges = us.argmin(-1)
+
 
     if "prominence" not in kwargs:
         kwargs["prominence"] = 0
@@ -241,6 +253,14 @@ def find_peaks(
 
     peak_data["peak_left_border"] = np.floor(peak_left_border).astype(int)
     peak_data["peak_right_border"] = np.ceil(peak_right_border).astype(int)
+
+    if peak_ranges is not None:
+        for i,p in enumerate(peaks):
+            ranges=(p >=peak_ranges[:,0])&(p <=peak_ranges[:,1])
+            ranei=ranges.argmax()
+            if ranges[ranei]:
+                peak_data["peak_left_border"][i] = max(peak_data["peak_left_border"][i],peak_ranges[ranei][0])
+                peak_data["peak_right_border"][i] = min(peak_data["peak_right_border"][i],peak_ranges[ranei][1])
 
     peak_data["peak_maximum"] = peaks.copy()
     peak_data["peak_mean"] = np.round((peak_data["peak_left_border"] + peak_data["peak_right_border"]) / 2).astype(int)

@@ -1,7 +1,27 @@
 import json
 
 #FOLDER = "C:\\Users\\be34gof\\Downloads\\TSU-141-E"
-FOLDER = "C:\\Users\\be34gof\\Downloads\\25_11_2021"
+from pprint import pprint
+
+FOLDER = [
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220202115053-PE-236-1",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220204071912-PE-236-2",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220207081529-PE-236-3",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220209093938-PE-236-4",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220218100335_PE-236-5",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220216095015_PE-238-1",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220217124558_PE-239-1_30°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220217143734_PE-239-2_25°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220217164550_PE-239-3_20°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220221090332 PE-239-4_15°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220222092051 PE-239-5_10°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220211084759-PE-237-1-5°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220214034707_PE-237_3-15°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220214102859_PE-237-4-10°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220214161917_PE-237-5-25°C",
+    "C:\\Users\\be34gof\\Downloads\\autonmr\\20220215094536_PE-237-6-30°C",
+]
+
 MIN_PEAK_HEIGHT = 0.05  # minimum peak height relative to the largest peak
 PEAK_BOARDER_RELATIVE_HEIGHT = 0.01  # peak height relative to the peak maximum which sets the integration limits
 MAX_PEAK_WIDTH = 1  # maximum peak with, to limit very small and broad peaks
@@ -11,17 +31,18 @@ ALLOW_PPM_STRETCH = False  # weather the ppm scale can be stretched to get expec
 
 FIXED_SCALE = [0, 6]
 EXPECTED_PEAKS = [2.7, 3.9, 4.5]  # list of expected peaks for shift correction
-MANUAL_PEAKS = [2.7, 3.9, 4.12, 4.3, 4.5]  # list of expected peaks for shift correction
+MANUAL_PEAKS = [2.7, 3.9, 4.12, 4.2, 4.5]  # list of expected peaks for shift correction
 MANUAL_PEAK_RANGES = [
-    [2.40, 3.3],
+    [2.40, 3.],
     [3.4, 4.0],
-    [4.0, 4.15],
-    [4.15, 4.36],
-    [4.37, 4.78],
+    [4.0, 4.17],
+    [4.1701, 4.3499],
+    [4.35, 4.78],
 ]
 
-SPECIES_PEAKS = [[3.9], [4.12], [4.3], [4.5],[2.7]]
+SPECIES_PEAKS = [[3.9], [4.12], [4.2], [4.5],[2.7]]
 SPECIES_PEAK_AREAS = [[2], [4], [6], [6],[6]]
+SPECIES_MW = [76.1 , 76.1+30.03 , 76.1+3*30.03 , 90.08 , 0]
 SPECIES_PEAKS_NAMES = ["OME-1","OME-2","OME-3+","Trioxane","OME-CH3"]
 
 # REFERENCE_PEAK=None
@@ -36,6 +57,7 @@ SHOW_PLOTS = False  # live show plots, normally False
 CREATE_TABLE = True  # results are stored as table files
 RESULT_TABLE = True  # merge all results to on table
 RECREATE = False  # recalc spec even if it is already in the results table
+
 TABLE_TYPE = "xlsx"  # type of table data, use 'xlsx' for an excel-file or 'csv' for a csv-file
 
 
@@ -157,12 +179,12 @@ def work_spec(data, data_dict, path):
 
 
     # initial peak finder
-    peaks, peak_data = manual_peak_finder(y=data, x=ppm_scale, peak_ranges=MANUAL_PEAK_RANGES)
+    #peaks, peak_data = manual_peak_finder(y=data, x=ppm_scale, peak_ranges=MANUAL_PEAK_RANGES)
     peaks, peak_data = find_peaks(y=data, x=ppm_scale,min_peak_height=MIN_PEAK_HEIGHT,
                                   rel_height=PEAK_BOARDER_RELATIVE_HEIGHT,
                                   min_distance=MIN_PEAK_DISTANCE,
                                   max_width=MAX_PEAK_WIDTH,
-                                  rel_prominence=0.1,
+                                  rel_prominence=0.1
                                   )
 
     # shift ppm scale to match expectations
@@ -186,6 +208,7 @@ def work_spec(data, data_dict, path):
                                   min_distance=MIN_PEAK_DISTANCE,
                                   max_width=MAX_PEAK_WIDTH,
                                   rel_prominence=0.5,
+                                  peak_ranges=MANUAL_PEAK_RANGES
                                   )
     if PLOT_INTERMEDIATES:
         image_number += 1
@@ -297,42 +320,91 @@ def work_spec(data, data_dict, path):
 
 
     # finishing up
+
+    peak_targets=ppm_scale[peaks].copy()
+    flatted_specie_peaks=[]
+    flatted_specie_peaks_indices=[]
+    flatted_specie_peaks_areas=[]
+    for i,pl in enumerate(SPECIES_PEAKS):
+        flatted_specie_peaks.extend(pl)
+        flatted_specie_peaks_areas.extend(SPECIES_PEAK_AREAS[i])
+        flatted_specie_peaks_indices.extend([i]*len(pl))
+    flatted_specie_peaks=np.array(flatted_specie_peaks)
+    flatted_specie_peaks_areas=np.array(flatted_specie_peaks_areas)
+    flatted_specie_peaks_indices=np.array(flatted_specie_peaks_indices)
+
+    diff_matrix = np.abs(np.subtract.outer(flatted_specie_peaks,peak_targets))
+    sorted_indices=[]
+    while np.any(~np.isnan(diff_matrix)):
+        induices =np.unravel_index(np.nanargmin(diff_matrix), diff_matrix.shape)
+        sorted_indices.append(induices)
+        diff_matrix[induices]=np.nan
+    sorted_indices=np.array(sorted_indices).astype(float)
+
+    targets={}
+    #print(flatted_specie_peaks,peak_targets)
+    #print(sorted_indices)
+    while sorted_indices.shape[0]>0:
+        sorted_indices=sorted_indices[~np.isnan(sorted_indices)].reshape(-1,2)
+        found=False
+
+        for i,(ix1,ix2) in enumerate(sorted_indices):
+            ix1=int(ix1)
+            ix2=int(ix2)
+            species_peak=flatted_specie_peaks[ix1]
+            target_peak=peak_targets[ix2]
+            dec_range=detected_peak_ranges[ix2]
+            if dec_range[0]<=species_peak and dec_range[1]>=species_peak:
+                found=True
+                targets[target_peak]=ix1
+                sorted_indices[sorted_indices[:,0]==ix1]=np.nan
+                sorted_indices[sorted_indices[:,1]==ix2]=np.nan
+                break
+
+        if not found:
+            sorted_indices[:]=np.nan
+
+        if sorted_indices.shape[0]==0:
+            break
+
+    #print(targets)
+    df = pd.DataFrame({
+        "ppm": ppm_scale[peaks],
+        "ppm_max": ppm_scale[peak_data["peak_maximum"]],
+        "species": [(SPECIES_PEAKS_NAMES[flatted_specie_peaks_indices[targets.get(p)]] if targets.get(p) is not None else "") for p in peak_targets],
+        "species_peak": [(flatted_specie_peaks[targets.get(p)] if targets.get(p) is not None else np.nan) for p in peak_targets],
+        "species_peak_area":[(flatted_specie_peaks_areas[targets.get(p)] if targets.get(p) is not None else np.nan) for p in peak_targets],
+        "ppm_mean": ppm_scale[peak_data["peak_mean"]],
+        "ppm_median": ppm_scale[peak_data["peak_median"]],
+        "left_border": ppm_scale[peak_data['peak_left_border']],
+        "height": peak_data["peak_heights"],
+        "right_border": ppm_scale[peak_data['peak_right_border']],
+        "area": peak_data["integrals"],
+        "est nucl.": np.round(peak_data["integrals"]).astype(int),
+    })
+    df["estimated_rel_conc"]=df["area"]/df["species_peak_area"]
+    df["Sample"] = data_dict['acqu'].get('Sample', "sample_name")
+
+    df.sort_values("ppm",inplace=True)
     if PLOT_RESULT:
         image_number += 1
 
         plt.plot(ppm_scale, data, linewidth=1)
 
+        max_height=df["height"].max()
 
-        for i in range(len(SPECIES_PEAKS_NAMES)):
-            target_peaks=SPECIES_PEAKS[i]
-            found=True
-            for tp in target_peaks:
-                if detected_peak_ranges.size==0 or ((detected_peak_ranges[:,0]<=tp) & (detected_peak_ranges[:,1]>=tp)).sum()==0:
-                    #tp not found
-                    found=False
-                    break
-            if not found:
-                continue
-
-
-            peak_positions=[]
-            for p in target_peaks:
-                peak_positions.append(np.abs(ppm_scale[peaks]-p).argmin())
-
-            mean_height=peak_data["peak_heights"][peak_positions].mean()
-            center_y=max(mean_height/2,peak_data["peak_heights"].max()/2)
-
-            center_x=np.mean(ppm_scale[peaks][peak_positions])
-
-            plt.text(center_x,center_y,SPECIES_PEAKS_NAMES[i],rotation="vertical",ha="center",alpha=0.6)
+        for r,d in df.iterrows():
+            center_x=d["ppm_mean"]
+            center_y=min(max_height/2,d["height"]*1.1)
             plt.plot(
-                [center_x]*len(target_peaks)+list(ppm_scale[peaks][peak_positions]),
-                [center_y]*len(target_peaks)+list(peak_data["peak_heights"][peak_positions]/2),
+                [center_x,d["ppm"]],
+                [center_y,d["height"]/2],
                 "k",alpha=0.3,linewidth=1)
+            plt.text(center_x,center_y,d["species"],rotation="vertical",ha="center",alpha=0.6)
 
-        plt.plot(ppm_scale[peak_data["peak_median"]], peak_data["peak_heights"], "+", label="peaks median")
-        plt.plot(ppm_scale[peak_data["peak_maximum"]], peak_data["peak_heights"], "+", label="peaks maximum")
-        plt.plot(ppm_scale[peak_data["peak_mean"]], peak_data["peak_heights"], "+", label="peaks mean")
+        plt.plot(df["ppm_median"], df["height"], "+", label="peaks median")
+        plt.plot(df["ppm_max"], df["height"], "+", label="peaks maximum")
+        plt.plot(df["ppm_mean"], df["height"], "+", label="peaks mean")
 
         cumi = peak_data["cum_integral"]
         cumi = cumi - cumi.min()
@@ -358,22 +430,12 @@ def work_spec(data, data_dict, path):
             plt.show()
         plt.close()
 
-    df = pd.DataFrame({
-        "ppm": ppm_scale[peaks],
-        "ppm_max": ppm_scale[peak_data["peak_maximum"]],
-        "ppm_mean": ppm_scale[peak_data["peak_mean"]],
-        "left_border": ppm_scale[peak_data['peak_left_border']],
-        "right_border": ppm_scale[peak_data['peak_right_border']],
-        "area": peak_data["integrals"],
-        "est nucl.": np.round(peak_data["integrals"]).astype(int),
-    })
-
     try:
         df['startTime'] = dateutil.parser.parse(data_dict['acqu']['startTime'])
     except KeyError:
         df['startTime'] = dateutil.parser.parse("01.01.1990")
 
-    df["Sample"] = data_dict['acqu'].get('Sample', "sample_name")
+
 
     with open(os.path.join(path, "processing_flow.txt"),"w+") as f:
         json.dump(processing,f,indent=4)
@@ -387,47 +449,205 @@ def work_spec(data, data_dict, path):
     return df
 
 
-def main():
+def main(folder):
+    print(folder)
     results_df = pd.DataFrame()
+    nindx = ["path", 'Sample', 'startTime',"delta_time", "peak"]
+    snindx = ["path", 'Sample', 'startTime', "peak"]
     if RESULT_TABLE:
-        res_file = os.path.join(FOLDER, "results.xlsx")
+        res_file = os.path.join(folder, "results.xlsx")
+        res_file_flat = os.path.join(folder, "results_flat.xlsx")
         try:
-            results_df = pd.read_excel(res_file, index_col=[0, 1, 2, 3])
+            results_df = pd.read_excel(res_file, index_col=list(range(len(nindx))))
         except FileNotFoundError:
             pass
     change = False
 
+    sresults_df = results_df.copy()
+    results_df = results_df.reset_index()
     def _sp(path):
-        #if not os.path.basename(path).endswith("0"):
-         #   return True
-        return "path" in results_df.index.names and path in results_df.index.get_level_values(
-            results_df.index.names.index('path')) and not RECREATE
+        iname=os.path.basename(path)
+        #while iname.startswith("0") and len(iname)>1:
+        #    iname=iname[1:]
+        #print(iname)
+        #if iname.startswith("0") and int(iname)<100:
+        #    return True
+        return "path" in sresults_df.index.names and path in sresults_df.index.get_level_values(
+            sresults_df.index.names.index('path')) and not RECREATE
 
-    for data, data_dict in find_nmrs(FOLDER, skip_path=_sp):
+
+
+
+    for data, data_dict in find_nmrs(folder, skip_path=_sp):
         path = data_dict["path"]
+        try:
+            sdf = work_spec(data, data_dict, path)
+        except (PeakNotFoundError,IndexError) as e:
+            continue
 
-        sdf = work_spec(data, data_dict, path)
         sdf["path"] = path
         sdf["peak"] = sdf.index.values + 1
 
-        nindx = ["path", 'startTime', 'Sample', "peak"]
-        sdf.set_index(nindx, inplace=True)
-        results_df = pd.concat([results_df, sdf[~sdf.index.isin(results_df.index)]])
-        results_df.update(sdf)
+
+        for r,d in sdf.iterrows():
+            sd=results_df
+            for c in snindx:
+                if c not in sd.columns:
+                    continue
+                sd=sd[sd[c]==d[c]]
+            if len(sd)>0:
+                results_df.loc[sd.index[0]]=d
+            else:
+                results_df = results_df.append(d)
+        #sdf.set_index([nx for nx in nindx if nx in sdf.columns], inplace=True)
+
+        #results_df = pd.concat([results_df, sdf[~sdf.index.isin(results_df.index)]])
+        #results_df.update(sdf)
         change = True
 
-
-    print(results_df)
-    results_df.sort_values("startTime",inplace=True)
-
     if change and RESULT_TABLE:
+        results_df.sort_values(["startTime","ppm"],inplace=True)
+
+        results_df["delta_time"]=(results_df["startTime"]-results_df.iloc[0]["startTime"])
+        results_df["delta_time"] = results_df["delta_time"].apply(lambda d: d.total_seconds())
+
         try:
-            results_df.to_excel(res_file, merge_cells=True)
+            results_df.to_excel(res_file_flat, merge_cells=True)
+        except PermissionError:
+            print(f"cannot write to file {res_file_flat}, maybe it is opened in another program?")
+
+        try:
+            results_df.set_index(nindx).to_excel(res_file, merge_cells=True)
         except PermissionError:
             print(f"cannot write to file {res_file}, maybe it is opened in another program?")
     else:
         print("no changes detected")
 
+    def moving_average(a, n=3) :
+        n=min(n,a.shape[0])
+        a=a.copy()
+        if len(a.shape)==1:
+            a=a.reshape(-1,1)
+
+
+        ret = np.cumsum(np.nan_to_num(a), dtype=float,axis=0)
+        starts = (ret!=0).argmax(0)
+
+        starts[ret[starts,np.arange(starts.shape[0])]==0]=a.shape[0]-1
+        for i,s in enumerate(starts):
+            a[:s,i]=a[s,i]
+
+        ret = np.cumsum(np.nan_to_num(a), dtype=float,axis=0)
+
+        ret[n:] = ret[n:] - ret[:-n]
+        ret[n - 1:]/=n
+        if n>1:
+            ret[:n - 1]=(ret[:n - 1].T/np.arange(1,n)).T
+        for i,s in enumerate(starts):
+            ret[s:s+n,i]=[np.nanmean(a[s:s+_n,i]) for _n in range(1,n+1)]
+            ret[:s,i]=np.nan
+        return ret
+
+
+    delta_times=results_df["delta_time"].unique()
+    species_peaks=results_df["species_peak"].unique()
+    species=results_df["species"].unique().astype(str)
+    species_peaks=species_peaks[~np.isnan(species_peaks)]
+    species=species[(~(species=="nan"))&(~(species==""))]
+
+    mol_wts=np.array([SPECIES_MW[SPECIES_PEAKS_NAMES.index(n)] for n in species])
+
+    plt.figure()
+    for p in species_peaks:
+        spd = results_df[results_df["species_peak"]==p]
+        time_dict={d:np.nan for d in delta_times}
+        for r,k in spd.iterrows():
+            time_dict[k["delta_time"]]=k["area"]
+        (keys,values) = zip(*time_dict.items())
+        keys,values = np.array(keys),np.array(values)
+        values=values[np.argsort(keys)]
+
+        plt.plot(spd["delta_time"], spd["area"], ".", label=f"{p} ppm")
+        t=40
+        #mvgav1 = moving_average(values,t1)
+        #mvgav1 = moving_average(mvgav1,t2)
+        mvgav = moving_average(values,t)
+        #mvgav[:-int(t/2)]=mvgav[int(t/2):]
+        #plt.plot(delta_times, mvgav1, "-", label=f"avg. {p} ppm")
+        plt.plot(delta_times, mvgav, "-", label=f"avg. {p} ppm")
+        #plt.plot(delta_times, a, "-", label=f"a. {p} ppm")
+
+    plt.legend()
+    plt.title("NMR areas area over time")
+    plt.xlabel("t [s]")
+    plt.ylabel("rel. area")
+    plt.savefig(os.path.join(folder, "nmr_area_over_time.png"),dpi=300)
+    plt.close()
+
+    plt.figure()
+    for p in species:
+        spd = results_df[results_df["species"]==p]
+        time_dict={d:(np.nan,0) for d in delta_times}
+        for r,k in spd.iterrows():
+            time_dict[k["delta_time"]]=(k["estimated_rel_conc"],1) if time_dict[k["delta_time"]][1]==0 else (time_dict[k["delta_time"]][0]+k["estimated_rel_conc"],time_dict[k["delta_time"]][1]+1)
+
+        for k in time_dict.keys():
+            time_dict[k]=time_dict[k][0]/time_dict[k][1] if time_dict[k][1]>0 else time_dict[k][0]
+
+        (keys,values) = zip(*time_dict.items())
+        keys,values = np.array(keys),np.array(values)
+        values=values[np.argsort(keys)]
+
+        plt.plot(spd["delta_time"], spd["estimated_rel_conc"], ".", label=f"{p} ppm")
+        t=40
+        #mvgav1 = moving_average(values,t1)
+        #mvgav1 = moving_average(mvgav1,t2)
+        mvgav = moving_average(values,t)
+        mvgav[:-int(t/2)]=mvgav[int(t/2):]
+        #plt.plot(delta_times, mvgav1, "-", label=f"avg. {p} ppm")
+        plt.plot(delta_times, mvgav, "-", label=f"avg. {p} ppm")
+        #plt.plot(delta_times, a, "-", label=f"a. {p} ppm")
+
+    plt.legend()
+    plt.title("Species conc over time")
+    plt.xlabel("t [s]")
+    plt.ylabel("rel. conc")
+    plt.savefig(os.path.join(folder, "species_over_time.png"),dpi=300)
+    plt.close()
+
+
+
+    species_weight=np.zeros((len(delta_times),len(mol_wts)))
+    for i,p in enumerate(species):
+        spd = results_df[results_df["species"]==p]
+        time_dict={d:(np.nan,0) for d in delta_times}
+        for r,k in spd.iterrows():
+            time_dict[k["delta_time"]]=(k["estimated_rel_conc"],1) if time_dict[k["delta_time"]][1]==0 else (time_dict[k["delta_time"]][0]+k["estimated_rel_conc"],time_dict[k["delta_time"]][1]+1)
+
+        for k in time_dict.keys():
+            time_dict[k]=time_dict[k][0]/time_dict[k][1] if time_dict[k][1]>0 else time_dict[k][0]
+
+        (keys,values) = zip(*time_dict.items())
+        keys,values = np.array(keys),np.array(values)
+        sorter=np.argsort(keys)
+        values=values[sorter]
+        keys=keys[sorter]
+        mol_wt=SPECIES_MW[SPECIES_PEAKS_NAMES.index(p)]
+        species_weight[np.argsort(keys),i]=values*mol_wt
+    species_weight=100*(species_weight.T/np.nan_to_num(species_weight).sum(1)).T
+    plt.figure()
+    for i,p in enumerate(species):
+        plt.plot(delta_times, species_weight[:,i], ".", label=f"{p} ppm")
+    plt.legend()
+    plt.title("w% over time")
+    plt.xlabel("t [s]")
+    plt.ylabel("w%")
+    plt.savefig(os.path.join(folder, "wp_over_time.png"),dpi=300)
+    plt.close()
+
+
+
+    return
     times = pd.to_datetime(results_df.index.get_level_values('startTime').unique()).values
     apd = np.zeros((len(times),SPECIES_PEAKS.size))*np.nan
     for i,t in enumerate(times):
@@ -454,9 +674,9 @@ def main():
     plt.title("NMR signal area over time")
     plt.xlabel("t [s]")
     plt.ylabel("rel. area")
-    plt.savefig(os.path.join(FOLDER, "nmr_area_over_time.png"),dpi=300)
-    plt.show()
-    plt.close()
+    #plt.savefig(os.path.join(folder, "nmr_area_over_time.png"),dpi=300)
+    #plt.show()
+    #plt.close()
 
     def _f(x, k, l, c):
         return k * np.exp(-l * x) + c
@@ -493,7 +713,7 @@ def main():
     #plt.plot(tdiff,c_triox,".",label=SPECIES_PEAKS_NAMES[4])
     #plt.plot(tdiff,c_ome_1+c_ome_2+c_ome_3,".",label="sum OME")
     #plt.legend()
-    #plt.savefig(os.path.join(FOLDER, "species_conc.png"),dpi=300)
+    #plt.savefig(os.path.join(folder, "species_conc.png"),dpi=300)
     #plt.show()
     #plt.close()
 
@@ -505,21 +725,15 @@ def main():
         arr = arr[idx]
         return arr
 
-    def moving_average(a, n=3) :
-        n=min(n,a.shape[0])
-        a=a.copy()
-        ret = np.cumsum(np.nan_to_num(a), dtype=float,axis=0)
-        ret[n:] = ret[n:] - ret[:-n]
-        ret[n - 1:]/=n
-        if n>1:
-            ret[:n - 1]=(ret[:n - 1].T/np.arange(1,n)).T
-        return ret
 
-    os.makedirs(os.path.join(FOLDER,"timelaps",),exist_ok=True)
+
+    os.makedirs(os.path.join(folder,"timelaps",),exist_ok=True)
+
+
     for ti in range(2,csa.shape[0],1):
         cs=csa[:ti]
         tdiff=tdiffa[:ti]
-        impath=os.path.join(FOLDER,"timelaps", f"{ti:06d}.png")
+        impath=os.path.join(folder,"timelaps", f"{ti:06d}.png")
         if os.path.exists(impath):
             continue
         mvg_avg = moving_average(cs,30)
@@ -561,15 +775,18 @@ def main():
 
         ax2.plot(tdiff,entry_point,label="mean gradient")
 
+        m=np.nanmax(entry_point)
+        n=np.nanmin(entry_point)
         if ep_idx>0:
-            ax2.vlines(tdiff[ep_idx],0,entry_point.max(),color="green",label="rxn start")
+            ax2.vlines(tdiff[ep_idx],n,m,color="green",label=f"rxn start ({tdiff[ep_idx]})")
 
 
             if lp_idx>ep_idx:
-                ax2.vlines(tdiff[lp_idx],0,entry_point.max(),color="red",label="rxn end")
+                ax2.vlines(tdiff[lp_idx],n,m,color="red",label=f"rxn end ({tdiff[lp_idx]})")
 
         ax1.legend(loc='upper right')
         ax2.legend()
+        ax2.set_xlim(*ax1.get_xlim())
         plt.savefig(impath,dpi=200)
         #plt.show()
         plt.close()
@@ -577,9 +794,9 @@ def main():
     return
     images=[]
     import imageio
-    for f in sorted(os.listdir(os.path.join(FOLDER,"timelaps"))):
-        images.append(imageio.imread(os.path.join(FOLDER,"timelaps",f)))
-    imageio.mimsave(os.path.join(FOLDER,"timelaps.gif"), images)
+    for f in sorted(os.listdir(os.path.join(folder,"timelaps"))):
+        images.append(imageio.imread(os.path.join(folder,"timelaps",f)))
+    imageio.mimsave(os.path.join(folder,"timelaps.gif"), images)
 
     #moving_average(np.arange(100).reshape(25,4),5)
     #popt,pcov = curve_fit(poly, tdiff, c_ome_eg,bounds=([0],[10]))
@@ -637,4 +854,5 @@ def main():
     plt.close()
 
 if __name__ == '__main__':
-    main()
+    for f in FOLDER:
+        main(f)
