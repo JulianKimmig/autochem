@@ -1,0 +1,16 @@
+data_processing:
+  - baseline_correction: median
+  - normalization
+
+peak_picking:
+  min_height: 0.0
+  min_distance: 0.0
+
+parse_subfolders: True
+
+plotting:
+  #raw_data: True
+  #processed_data: True
+  #zoomed_data: True
+  result: True
+cutoff_ouside_data: True

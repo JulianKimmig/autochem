@@ -1,3 +1,4 @@
+from statistics import median
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
@@ -35,3 +36,7 @@ def asymmetric_least_squares_smoothing(y, lam, p, niter=10):
     return y-z, {
         "baseline": z,
     }
+
+def median_correction(data):
+    median=np.median(data)
+    return data-median, {"median": median}
