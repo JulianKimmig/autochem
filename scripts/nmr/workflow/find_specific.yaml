@@ -1,19 +1,50 @@
 data_processing:
   - baseline_correction: median
   - normalization
+  - auto_shift:
+      targets:
+        - 1.6
+        - 5.96
+        - 6.75
+      peak_find_kwargs:
+        rel_prominence: 0.1
+        min_peak_height: 0.1
+        min_distance: 0.5
+
+
 
 peak_picking:
   ranges:
-    - - 0.2
-      - 1.15
-    - - 1.18
-      -  1.8
-    - - 2.0
-      - 2.8
-    - - 5.6
+    - - 0
+      - 0.87
+    - - 0.87
+      -  1.2
+    - - 1.2
+      - 1.8
+    - - 2
+      - 2.6
+    - - 4.1
+      - 4.6
+    - - 4.6
+      - 5.2
+    - - 5.7
       - 6.2
     - - 6.2
-      - 7.1
+      - 7.0
+  #  - - 0.2
+  #    - 1.15
+  #  - - 1.18
+  #    -  1.8
+  #  - - 2.0
+  #    - 2.8
+  #  - - 5.6
+  #    - 6.2
+  #  - - 6.2
+  #    - 7.1
+
+reference:
+  ppm: 2.22
+  area: 1 #3
 
 parse_subfolders: True
 
@@ -22,4 +53,13 @@ plotting:
   #processed_data: True
   #zoomed_data: True
   result: True
+
 cutoff_ouside_data: True
+
+time_series:
+  parameter: area
+  smooth: 0.5
+  excludes:
+    #sum_max: 40
+    sum_min: 6
+
