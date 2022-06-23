@@ -8,7 +8,7 @@ data_processing:
         - 6.75
       peak_find_kwargs:
         rel_prominence: 0.1
-        min_peak_height: 0.1
+        min_peak_height: 0.05
         min_distance: 0.5
 
 
@@ -43,7 +43,7 @@ peak_picking:
   #    - 7.1
 
 reference:
-  ppm: 2.22
+  ppm: 6.75
   area: 1 #3
 
 parse_subfolders: True

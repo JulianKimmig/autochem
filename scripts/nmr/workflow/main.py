@@ -61,8 +61,6 @@ def solve_preprocess(preprocess):
                     peak_connection[i,:]=minidx
                 peak_connection=peak_connection[~np.isnan(peak_connection).all(axis=1)].astype(int)
 
-                print("AAAAA",peak_connection)
-                print(targest[peak_connection[:,1]],peak_ppm[peak_connection[:,0]])
                 #heights=y[peaks]
                 #sorter = np.argsort(heights)[::-1]
                 #print(x[peaks[sorter[:n]]])
@@ -73,6 +71,13 @@ def solve_preprocess(preprocess):
                 x=x*_m + _c
                 return x,y,[_m,_c]
             return _fp
+        elif action=="regulize":
+            ppu = data.get('ppu',100)
+            def _reg(x,y):
+                xn=np.linspace(x.min(),x.max(),int(np.ceil((x.max()-x.min())*ppu)))
+                yn=np.interp(xn,x,y)
+                return xn,yn,None
+            return _reg
         else:
             raise NotImplementedError(f"{action} not implemented")
     else:
@@ -120,21 +125,20 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
                                   #rel_height=peak_picking.get("rel_height",0.03),
                                   #max_width=peak_picking.get("max_peak_width",np.inf),
                                   #rel_prominence=peak_picking.get("rel_prominence",0.1),
-                                  center="median",
+                                  center="max",
                                   
-                                  )
-        print(peaks,peak_data)               
+                                  )          
         assert len(peaks) == len(peak_picking["ranges"])
 
     else:
-        peaks, peak_data = find_peaks(y=data, x=ppm_scale, min_peak_height=peak_picking.get("min_peak_height",0.02),
+
+        peaks, peak_data = find_peaks(y=data, x=ppm_scale, min_peak_height=peak_picking.get("min_peak_height",peak_picking.get("min_height",0.02)),
                                   rel_height=peak_picking.get("rel_height",0.03),
                                   max_width=peak_picking.get("max_peak_width",np.inf),
                                   min_distance=peak_picking.get("min_distance",0.01),
                                   rel_prominence=peak_picking.get("rel_prominence",0.1),
-                                  center="median"
+                                  center="max"
                                   )
-
 
     
     if cutoff_ouside_data:
@@ -307,8 +311,53 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
             
 
         ts_df=pd.DataFrame(ts_data)
-        spec_map=np.zeros((len(ts_specs),1000))*np.nan
+        SPECMAP_RES=1000
+        ppm_min=np.inf
+        ppm_max=-np.inf
         times=sorted(list(ts_specs.keys()))
+        time_min=min(times)
+        time_max=max(times)
+        for time,(ppm,data) in ts_specs.items():
+            ppm_min=min(ppm_min,ppm.min())
+            ppm_max=max(ppm_max,ppm.max())
+
+        spec_map=np.zeros((len(ts_specs),SPECMAP_RES))*np.nan
+        global_ppm=np.linspace(ppm_min,ppm_max,SPECMAP_RES)
+        ppppm=SPECMAP_RES/(ppm_max-ppm_min)
+
+        for i,time in enumerate(times):
+            if time not in ts_specs:
+                continue
+            ppm,data=ts_specs[time]
+            spec_map[i,:]=np.interp(global_ppm,ppm,data)
+        
+        spec_map_change=np.zeros_like(spec_map)
+        spec_map_change[1:,:]=spec_map[1:,:]-spec_map[:-1,:]
+
+
+        plt.figure()
+        plt.imshow(spec_map_change[::-1],aspect="auto",
+        extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()/60,]
+        )
+        plt.colorbar()
+        plt.ylabel("time")
+        plt.xlabel("ppm")
+
+        plt.savefig(os.path.join(path,"time_series_map_difference.png"),dpi=300)
+        
+
+        spect_change_sum=spec_map_change.sum(1)/ppppm
+        plt.figure()
+        plt.plot(times,spect_change_sum)
+        plt.xlabel("time")
+        plt.ylabel("change per ppm")
+        plt.xticks(rotation=90)
+        plt.tight_layout()
+        plt.savefig(os.path.join(path,"time_series_map_change_sum.png"),dpi=300)
+
+        
+            
+
 
         sum_max=excludes.get("sum_max",np.inf)
         sum_min=excludes.get("sum_min",-np.inf)
@@ -320,7 +369,15 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
         sum_min_exclude=list(ts_df[ts_df.sum(1)<sum_min].index)
         excluded_times.update(sum_min_exclude)
         ts_df.drop(sum_min_exclude, inplace=True)
-  
+
+        rel_change_max=excludes.get("rel_change_max",np.inf)
+        for i,c in enumerate(spect_change_sum):
+            if c>rel_change_max:
+                excluded_times.add(times[i])
+                ts_df.drop(times[i], inplace=True)
+                spec_map_change
+                
+
 
         ts_df.sort_index(inplace=True)
         ts_df.to_excel(os.path.join(path,"time_series.xlsx"))
@@ -330,9 +387,36 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
             line, = plt.plot(ts_df.index,ts_df[c],label=str(c),alpha=alpha)
             if smooth_weight>0:
                 plt.plot(ts_df.index,smooth(ts_df[c],smooth_weight),label=f"{c} smooth",linestyle="-", color=line.get_color())
+        
+        plt.xlabel("time")
+        plt.xticks(rotation=90)
+        plt.ylabel("intensity")
         plt.legend()
+        plt.tight_layout()
         plt.savefig(os.path.join(path,"time_series.png"),dpi=300)
         plt.close()
+
+        tsd=os.path.join(path,"time_series_detailed")
+        os.makedirs(tsd,exist_ok=True)
+        for c1 in ts_df.columns:
+            c1d=ts_df[c1].values
+            for c2 in ts_df.columns:
+                if c1==c2:
+                    continue
+                c2d=c1d/ts_df[c2].values
+
+                plt.figure()
+                line, = plt.plot(ts_df.index,c2d,label=str(c1),alpha=alpha)
+                if smooth_weight>0:
+                    plt.plot(ts_df.index,smooth(c2d,smooth_weight),label=f"{c1} smooth",linestyle="-", color=line.get_color())
+                plt.title(f"{c1} with const. {c2}")
+                plt.xlabel("time")
+                plt.xticks(rotation=90)
+                plt.tight_layout()
+                plt.ylabel("intensity")
+                plt.legend()
+                plt.savefig(os.path.join(tsd,f"{c1}_const_{c2}.png"),dpi=300)
+                plt.close()
 
         for t in excluded_times:
             if t in ts_specs:
@@ -351,7 +435,7 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
             ppm_max=max(ppm_max,ppm.max())
         
         
-        global_ppm=np.linspace(ppm_min,ppm_max,1000)
+        
         for i,time in enumerate(times):
             if time not in ts_specs:
                 continue
@@ -366,9 +450,21 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
         plt.imshow(spec_map,aspect="auto",
         extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()/60,]
         )
+        plt.colorbar()
         plt.ylabel("time")
         plt.xlabel("ppm")
+
         plt.savefig(os.path.join(path,"time_series_map.png"),dpi=300)
+
+        spec_map=np.log(spec_map)
+        plt.imshow(spec_map,aspect="auto",
+        extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()/60,]
+        )
+        plt.colorbar()
+        plt.ylabel("time")
+        plt.xlabel("ppm")
+
+        plt.savefig(os.path.join(path,"time_series_map_log.png"),dpi=300)
 
 
 
@@ -378,15 +474,24 @@ if __name__ == '__main__':
     # config and path from argument
     import argparse
     parser = argparse.ArgumentParser(description='NMR workflow')
-    parser.add_argument('-c', '--config', help='config file', required=True)
+    parser.add_argument('-c', '--config', help='config file',default=None, required=False)
     parser.add_argument('-p', '--path', help='path to data', required=True)
+    import shutil
     args = parser.parse_args()
     config_file = args.config
     path = args.path
+    if config_file is None:
+        config_file = os.path.join(path,"config.yaml")
+
+    if not os.path.exists(config_file):
+        raise FileNotFoundError(f"config file '{config_file}' not found")
+    
     #laod config from yaml
     import yaml
     with open(config_file, 'r') as f:
         config = yaml.safe_load(f)
     
+    if os.path.abspath(config_file)!=os.path.abspath( os.path.join(path,"config.yaml")):
+        shutil.copy(config_file, os.path.join(path,"config.yaml"))
 
     main(path,**config)
