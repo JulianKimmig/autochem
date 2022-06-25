@@ -62,4 +62,5 @@ time_series:
   excludes:
     #sum_max: 40
     sum_min: 6
+    
 

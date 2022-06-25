@@ -311,71 +311,83 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
             
 
         ts_df=pd.DataFrame(ts_data)
-        SPECMAP_RES=1000
-        ppm_min=np.inf
-        ppm_max=-np.inf
-        times=sorted(list(ts_specs.keys()))
-        time_min=min(times)
-        time_max=max(times)
-        for time,(ppm,data) in ts_specs.items():
-            ppm_min=min(ppm_min,ppm.min())
-            ppm_max=max(ppm_max,ppm.max())
 
-        spec_map=np.zeros((len(ts_specs),SPECMAP_RES))*np.nan
-        global_ppm=np.linspace(ppm_min,ppm_max,SPECMAP_RES)
-        ppppm=SPECMAP_RES/(ppm_max-ppm_min)
+        for ei in range(10):
+            SPECMAP_RES=1000
+            ppm_min=np.inf
+            ppm_max=-np.inf
+            times=sorted(list(ts_specs.keys()))
+            for t in excluded_times:
+                if t in times:
+                    times.remove(t)
+            time_min=min(times)
+            time_max=max(times)
+            for time,(ppm,data) in ts_specs.items():
+                ppm_min=min(ppm_min,ppm.min())
+                ppm_max=max(ppm_max,ppm.max())
 
-        for i,time in enumerate(times):
-            if time not in ts_specs:
-                continue
-            ppm,data=ts_specs[time]
-            spec_map[i,:]=np.interp(global_ppm,ppm,data)
-        
-        spec_map_change=np.zeros_like(spec_map)
-        spec_map_change[1:,:]=spec_map[1:,:]-spec_map[:-1,:]
+            spec_map=np.zeros((len(ts_specs),SPECMAP_RES))*np.nan
+            global_ppm=np.linspace(ppm_min,ppm_max,SPECMAP_RES)
+            ppppm=SPECMAP_RES/(ppm_max-ppm_min)
+
+            for i,time in enumerate(times):
+                if time not in ts_specs:
+                    continue
+                if time in excluded_times:
+                    continue
+                ppm,data=ts_specs[time]
+                spec_map[i,:]=np.interp(global_ppm,ppm,data)
+            
+            spec_map=spec_map[~np.isnan(spec_map).all(axis=1)]
+            spec_map_change=np.zeros_like(spec_map)
+            spec_map_change[1:,:]=spec_map[1:,:]-spec_map[:-1,:]
 
 
-        plt.figure()
-        plt.imshow(spec_map_change[::-1],aspect="auto",
-        extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()/60,]
-        )
-        plt.colorbar()
-        plt.ylabel("time")
-        plt.xlabel("ppm")
+            plt.figure()
+            plt.imshow(spec_map_change[::-1],aspect="auto",
+            extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()/60,]
+            )
+            plt.colorbar()
+            plt.ylabel("time")
+            plt.xlabel("ppm")
 
-        plt.savefig(os.path.join(path,"time_series_map_difference.png"),dpi=300)
-        
-
-        spect_change_sum=spec_map_change.sum(1)/ppppm
-        plt.figure()
-        plt.plot(times,spect_change_sum)
-        plt.xlabel("time")
-        plt.ylabel("change per ppm")
-        plt.xticks(rotation=90)
-        plt.tight_layout()
-        plt.savefig(os.path.join(path,"time_series_map_change_sum.png"),dpi=300)
-
-        
+            plt.savefig(os.path.join(path,f"time_series_map_difference_{ei}.png"),dpi=300)
             
 
+            spect_change_sum=spec_map_change.sum(1)/ppppm
+            plt.figure()
+            plt.plot(times,spect_change_sum)
+            plt.xlabel("time")
+            plt.ylabel("change per ppm")
+            plt.xticks(rotation=90)
+            plt.tight_layout()
+            plt.savefig(os.path.join(path,f"time_series_map_change_sum_{ei}.png"),dpi=300)
 
-        sum_max=excludes.get("sum_max",np.inf)
-        sum_min=excludes.get("sum_min",-np.inf)
+            
+                
+            someex=False
 
-        sum_max_exclude=list(ts_df[ts_df.sum(1)>sum_max].index)
-        excluded_times.update(sum_max_exclude)
-        ts_df.drop(sum_max_exclude, inplace=True)
-        
-        sum_min_exclude=list(ts_df[ts_df.sum(1)<sum_min].index)
-        excluded_times.update(sum_min_exclude)
-        ts_df.drop(sum_min_exclude, inplace=True)
+            sum_max=excludes.get("sum_max",np.inf)
+            sum_min=excludes.get("sum_min",-np.inf)
 
-        rel_change_max=excludes.get("rel_change_max",np.inf)
-        for i,c in enumerate(spect_change_sum):
-            if c>rel_change_max:
-                excluded_times.add(times[i])
-                ts_df.drop(times[i], inplace=True)
-                spec_map_change
+            sum_max_exclude=list(ts_df[ts_df.sum(1)>sum_max].index)
+            excluded_times.update(sum_max_exclude)
+            ts_df.drop(sum_max_exclude, inplace=True)
+            
+            sum_min_exclude=list(ts_df[ts_df.sum(1)<sum_min].index)
+            excluded_times.update(sum_min_exclude)
+            ts_df.drop(sum_min_exclude, inplace=True)
+
+            rel_change_max=excludes.get("rel_change_max",np.inf)
+            for i,c in enumerate(spect_change_sum):
+                if c>rel_change_max:
+                    excluded_times.add(times[i])
+                    ts_df.drop(times[i], inplace=True)
+                    someex=True
+            if someex:
+                continue
+            break
+                
                 
 
 
@@ -404,6 +416,7 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
                 if c1==c2:
                     continue
                 c2d=c1d/ts_df[c2].values
+                c2d=100*c2d/c2d[0]
 
                 plt.figure()
                 line, = plt.plot(ts_df.index,c2d,label=str(c1),alpha=alpha)
