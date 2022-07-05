@@ -33,7 +33,11 @@ def solve_preprocess(preprocess):
         assert len(preprocess) == 1, "only one preprocess action at a time"
         action=list(preprocess.keys())[0]
         data=list(preprocess.values())[0]
-
+        if action == "scaling":
+            from autochem.utils.corrections import norm_nm
+            ymax=data.get("max",None)
+            ymin=data.get("min",None)
+            return lambda x,y: norm_nm(x,y,n=ymin,m=ymax)
         if action == "baseline_correction":
             if data == "median":
                 from autochem.utils.corrections.baseline import median_correction
@@ -44,32 +48,60 @@ def solve_preprocess(preprocess):
             from autochem.utils.corrections.shift import get_signal_shift
             targest=np.array(data["targets"])
             allow_stretch=data.get("allow_stretch",False)
-            n=int(data.get("n",len(targest)*1.5))
+           
             peak_find_kwargs=data.get("peak_find_kwargs",{})
-            def _fp(x,y):
-                peaks, peak_data = find_peaks(y=y, x=x,**peak_find_kwargs)
-                peak_ppm=x[peaks]
-                dist_matrix = np.abs( np.subtract.outer(peak_ppm,targest))
-                peak_connection=np.zeros((len(targest),2))*np.nan
-                for i in range(peak_connection.shape[0]):
-                    if np.isnan(dist_matrix).all():
-                        break
 
-                    minidx = np.unravel_index(np.nanargmin(dist_matrix), dist_matrix.shape)
-                    dist_matrix[minidx[0],:]=np.nan
-                    dist_matrix[:,minidx[1]]=np.nan
-                    peak_connection[i,:]=minidx
-                peak_connection=peak_connection[~np.isnan(peak_connection).all(axis=1)].astype(int)
+            method=data.get("method","closest")
+            if method == "closest":
+                def _fp(x,y):
+                    peaks, peak_data = find_peaks(y=y, x=x,**peak_find_kwargs)
+                    peak_ppm=x[peaks]
+                    dist_matrix = np.abs( np.subtract.outer(peak_ppm,targest))
+                    peak_connection=np.zeros((len(targest),2))*np.nan
+                    for i in range(peak_connection.shape[0]):
+                        if np.isnan(dist_matrix).all():
+                            break
 
-                #heights=y[peaks]
-                #sorter = np.argsort(heights)[::-1]
-                #print(x[peaks[sorter[:n]]])
-                _m,_c = get_signal_shift(
-                    #x[peaks[sorter[:n]]],
-                    peak_ppm[peak_connection[:,0]],
-                    targest,allow_stretch=allow_stretch)
-                x=x*_m + _c
-                return x,y,[_m,_c]
+                        minidx = np.unravel_index(np.nanargmin(dist_matrix), dist_matrix.shape)
+                        dist_matrix[minidx[0],:]=np.nan
+                        dist_matrix[:,minidx[1]]=np.nan
+                        peak_connection[i,:]=minidx
+                    peak_connection=peak_connection[~np.isnan(peak_connection).all(axis=1)].astype(int)
+
+        
+                    _m,_c = get_signal_shift(
+                        peak_ppm[peak_connection[:,0]],
+                        targest,allow_stretch=allow_stretch)
+                    x=x*_m + _c
+                    return x,y,[_m,_c]
+            if method == "ordered":
+                def _fp(x,y):
+                    peaks, peak_data = find_peaks(y=y, x=x,**peak_find_kwargs)
+                    peak_ppm=x[peaks]
+                    peak_heights=peak_data["peak_heights"]
+
+                    #sort peak by height
+                    sorter = np.argsort(peak_heights)[::-1]
+                    peak_ppm=peak_ppm[sorter][:len(targest)]
+                    peak_heights=peak_heights[sorter][:len(targest)]
+
+                    _m,_c = get_signal_shift(
+                        peak_ppm,
+                        targest,allow_stretch=allow_stretch)
+                    x=x*_m + _c
+       
+                    return x,y,[_m,_c]
+            elif method == "free":
+                def _fp(x,y):
+                    peaks, peak_data = find_peaks(y=y, x=x,**peak_find_kwargs)
+                    peak_ppm=x[peaks]
+                    _m,_c = get_signal_shift(
+                        peak_ppm,
+                        targest,allow_stretch=allow_stretch)
+                    x=x*_m + _c
+                    return x,y,[_m,_c]
+            else:
+                raise NotImplementedError(f"method {method} not implemented")
             return _fp
         elif action=="regulize":
             ppu = data.get('ppu',100)
@@ -121,10 +153,10 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
     peak_ids=None
     if "ranges" in peak_picking:
         peaks, peak_data = manual_peak_finder(y=data, x=ppm_scale,peak_ranges=peak_picking["ranges"],
-                                min_peak_height=peak_picking.get("min_peak_height",peak_picking.get("min_height",0.02)),
-                                  rel_height=peak_picking.get("rel_height",0.03),
-                                  max_width=peak_picking.get("max_peak_width",np.inf),
-                                  rel_prominence=peak_picking.get("rel_prominence",0.1),
+                            #    min_peak_height=peak_picking.get("min_peak_height",peak_picking.get("min_height",0.02)),
+                            #      rel_height=peak_picking.get("rel_height",0.03),
+                            #      max_width=peak_picking.get("max_peak_width",peak_picking.get("max_width",np.inf)),
+                            #      rel_prominence=peak_picking.get("rel_prominence",0.1),
                                   center="median",
                                   
                                   )          
@@ -134,7 +166,7 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
         peaks, peak_data = find_peaks(y=data, x=ppm_scale,
                                 min_peak_height=peak_picking.get("min_peak_height",peak_picking.get("min_height",0.02)),
                                   rel_height=peak_picking.get("rel_height",0.03),
-                                  max_width=peak_picking.get("max_peak_width",np.inf),
+                                  max_width=peak_picking.get("max_peak_width",peak_picking.get("max_width",np.inf)),
                                   min_distance=peak_picking.get("min_distance",0.01),
                                   rel_prominence=peak_picking.get("rel_prominence",0.1),
                                   center="max"
@@ -153,7 +185,7 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
         ppm_min,
         ppm_max,
         )
-        print(zoom_indices)
+
         peaks, peak_data = cut_peaks_data(peaks, peak_data,*zoom_indices)
 
         if plotting['zoomed_data']:
@@ -178,11 +210,11 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
         plt.plot(ppm_scale,data)
         plt.scatter(ppm_scale[peaks],data[peaks],c='r',marker='+')
 
-        print(peaks)
+
         for i in range(peaks.shape[0]):
             lb = peak_data['peak_left_border'][i]
             rb = peak_data['peak_right_border'][i]
-            print(ppm_scale[lb],ppm_scale[rb])
+
             plt.fill_between(x=ppm_scale[lb:rb], y1=data[lb:rb], alpha=0.5,label=f"peak {i+1}")
 
 
@@ -207,7 +239,6 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
         means=ranges.mean(1)
         mean_sort=np.argsort(means)
         ppm_sorm=np.argsort(ppm_scale[peaks])
-        print(mean_sort,ppm_sorm)
         ranges=ranges[mean_sort][ppm_sorm]
         df["range"]=[f"{s}-{e}" for s,e in ranges]
 
@@ -217,11 +248,17 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
     df["Sample"] = udic['acqu'].get('Sample',"sample_name")
     df["#"]=np.arange(len(df))+1
     df.to_excel(os.path.join(path,"signals_ac.xlsx"),merge_cells=True)
-    raise NotImplementedError("integration not implemented")
-    return df
+
+    #dataframe with ppm_scale as 'ppm' and data as 'intesnity'
+    pd.DataFrame( {
+        "ppm":ppm_scale,
+        "intensity":data,
+    }).to_csv(os.path.join(path,"spec_processed.csv"),index=False)
+
+    return df,ppm_scale,data
 
 
-def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,bool]=None,peak_picking:Dict=None,cutoff_ouside_data=True,**kwargs):
+def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,bool]=None,peak_picking:Dict=None,cutoff_ouside_data=True,recalculate=True,**kwargs):
     if data_processing is None:
         data_processing = []
     if plotting is None:
@@ -237,6 +274,14 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
         ts_specs={}
 
     try:
+        if not recalculate:
+            try:
+                df = pd.read_excel(os.path.join(path,"signals_ac.xlsx"))
+                spec_d=pd.read_csv(os.path.join(path,"spec_processed.csv"))
+                ppm=spec_d["ppm"]
+                data=spec_d["intensity"]
+            except Exception:
+                pass
         data, udict = read_nmr(path, preprocess=True)
         logger.info("read '{}' as '{}'".format(path, udict["datatype"]))
         df,ppm,data = process_spectra(data,udict,data_processing,plotting,peak_picking,path,cutoff_ouside_data=cutoff_ouside_data,**kwargs)
@@ -257,8 +302,19 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
             #    continue
             try:
                 data, udict = read_nmr(subpath, preprocess=True)
-                logger.info("read '{}' as '{}'".format(subpath, udict["datatype"]))
-                _df,ppm,data = process_spectra(data,udict,data_processing,plotting,peak_picking,subpath,cutoff_ouside_data=cutoff_ouside_data,**kwargs)
+                try:
+                    if not recalculate:
+                        _df = pd.read_excel(os.path.join(subpath,"signals_ac.xlsx"))
+                        spec_d=pd.read_csv(os.path.join(subpath,"spec_processed.csv"))
+                        ppm=spec_d["ppm"]
+                        data=spec_d["intensity"]
+                        logger.info("reload '{}'".format(subpath))
+                    else:
+                        raise FileNotFoundError()
+                except Exception:
+                    logger.info("read '{}' as '{}'".format(subpath, udict["datatype"]))
+                    _df,ppm,data = process_spectra(data,udict,data_processing,plotting,peak_picking,subpath,cutoff_ouside_data=cutoff_ouside_data,**kwargs)
+
                 _df["path"]=os.path.relpath(subpath, path)
                 if "time_series" in kwargs:
                     ts_specs[udict_time(udict)]=(ppm,data)
@@ -271,8 +327,8 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
                 #    break
             except NMRReadError as e:
                 pass
-            except Exception as e:
-                logger.exception(e)
+            #except Exception as e:
+            #    logger.exception(e)
 
     grouper=["path"]
     if "ranges" in peak_picking: 
@@ -291,7 +347,7 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
         
         excluded_times=set()
 
-        from autochem.utils.corrections.smooth import smooth
+        
         for r,d in df.iterrows():
             key=r[1]
             if key not in ts_data:
@@ -300,6 +356,23 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
             
 
         ts_df=pd.DataFrame(ts_data)
+
+        delta_t=(max(ts_specs.keys())-min(ts_specs.keys())).total_seconds()
+        print("delta_t",delta_t)
+        time_scaler=1000
+        time_unit="s"
+        if delta_t>60*60*24*10:
+            time_scaler=time_scaler*60*60*24
+            time_unit="d"
+        elif delta_t>60*60*10:
+            time_scaler=time_scaler*60*60
+            time_unit="h"
+        elif delta_t>60*10:
+            time_scaler=time_scaler*60
+            time_unit="min"
+        print("time_scaler",time_scaler)
+        print("time_unit",time_unit)
+
 
         for ei in range(10):
             SPECMAP_RES=1000
@@ -334,10 +407,11 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
 
             plt.figure()
             plt.imshow(spec_map_change[::-1],aspect="auto",
-            extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()/60,]
+            cmap='plasma',
+            extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()*1000/time_scaler,]
             )
             plt.colorbar()
-            plt.ylabel("time")
+            plt.ylabel(f"time [{time_unit}]")
             plt.xlabel("ppm")
 
             plt.savefig(os.path.join(path,f"time_series_map_difference_{ei}.png"),dpi=300)
@@ -345,14 +419,16 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
 
             spect_change_sum=spec_map_change.sum(1)/ppppm
             plt.figure()
-            plt.plot(times,spect_change_sum)
-            plt.xlabel("time")
+            plt.plot((np.array(times)-min(times)).astype("timedelta64[ms]").astype(int) /time_scaler,spect_change_sum)
+            plt.xlabel(f"time [{time_unit}]")
             plt.ylabel("change per ppm")
             plt.xticks(rotation=90)
             plt.tight_layout()
             plt.savefig(os.path.join(path,f"time_series_map_change_sum_{ei}.png"),dpi=300)
 
             
+
+
                 
             someex=False
 
@@ -382,14 +458,21 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
 
         ts_df.sort_index(inplace=True)
         ts_df.to_excel(os.path.join(path,"time_series.xlsx"))
-        plt.figure()
+       
         alpha=0.3 if smooth_weight>0 else 1
+
+        try:
+            from autochem.utils.corrections.smooth import smooth
+        except ModuleNotFoundError:
+            smooth_weight=0
+            
+        plt.figure()
         for c in ts_df.columns:
-            line, = plt.plot(ts_df.index,ts_df[c],label=str(c),alpha=alpha)
+            line, = plt.plot((ts_df.index-ts_df.index.min()).astype("timedelta64[ms]").astype(int) / time_scaler,ts_df[c],label=str(c),alpha=alpha)
             if smooth_weight>0:
-                plt.plot(ts_df.index,smooth(ts_df[c],smooth_weight),label=f"{c} smooth",linestyle="-", color=line.get_color())
+                plt.plot((ts_df.index-ts_df.index.min()).astype("timedelta64[ms]").astype(int) / time_scaler,smooth(ts_df[c],smooth_weight),label=f"{c} smooth",linestyle="-", color=line.get_color())
         
-        plt.xlabel("time")
+        plt.xlabel(f"time [{time_unit}]")
         plt.xticks(rotation=90)
         plt.ylabel("intensity")
         plt.legend()
@@ -408,11 +491,11 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
                 c2d=100*c2d/c2d[0]
 
                 plt.figure()
-                line, = plt.plot(ts_df.index,c2d,label=str(c1),alpha=alpha)
+                line, = plt.plot((ts_df.index-ts_df.index.min()).astype("timedelta64[ms]").astype(int) / time_scaler,c2d,label=str(c1),alpha=alpha)
                 if smooth_weight>0:
-                    plt.plot(ts_df.index,smooth(c2d,smooth_weight),label=f"{c1} smooth",linestyle="-", color=line.get_color())
+                    plt.plot((ts_df.index-ts_df.index.min()).astype("timedelta64[ms]").astype(int) / time_scaler,smooth(c2d,smooth_weight),label=f"{c1} smooth",linestyle="-", color=line.get_color())
                 plt.title(f"{c1} with const. {c2}")
-                plt.xlabel("time")
+                plt.xlabel(f"time [{time_unit}]")
                 plt.xticks(rotation=90)
                 plt.tight_layout()
                 plt.ylabel("intensity")
@@ -429,44 +512,51 @@ def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,
         time_min=min(times)
         time_max=max(times)
 
-        single_spec_dir=os.path.join(path,"single_spectra")
-        os.makedirs(single_spec_dir,exist_ok=True)
-
         for time,(ppm,data) in ts_specs.items():
             ppm_min=min(ppm_min,ppm.min())
             ppm_max=max(ppm_max,ppm.max())
-        
-        
-        
-        for i,time in enumerate(times):
-            if time not in ts_specs:
-                continue
-            ppm,data=ts_specs[time]
-            spec_map[-i-1,:]=np.interp(global_ppm,ppm,data)
-            plt.figure()
-            plt.plot(ppm,data)
-            plt.savefig(os.path.join(single_spec_dir,f"{time.strftime('%y_%m_%d-%H_%M_%S')}.png"),dpi=300)
-            plt.close()
 
+        if kwargs["time_series"].get("single_spectra",True):
+            single_spec_dir=os.path.join(path,"single_spectra")
+            os.makedirs(single_spec_dir,exist_ok=True)
+
+            for i,time in enumerate(times):
+                if time not in ts_specs:
+                    continue
+                ppm,data=ts_specs[time]
+                spec_map[-i-1,:]=np.interp(global_ppm,ppm,data)
+                plt.figure()
+                plt.plot(ppm,data)
+                plt.savefig(os.path.join(single_spec_dir,f"{time.strftime('%y_%m_%d-%H_%M_%S')}.png"),dpi=300)
+                plt.close()
+    
         plt.figure()
         plt.imshow(spec_map,aspect="auto",
+        cmap='plasma',
         extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()/60,]
         )
         plt.colorbar()
-        plt.ylabel("time")
+        plt.ylabel(f"time [{time_unit}]")
         plt.xlabel("ppm")
 
         plt.savefig(os.path.join(path,"time_series_map.png"),dpi=300)
+        plt.close()
 
-        spec_map=np.log(spec_map)
-        plt.imshow(spec_map,aspect="auto",
+        plt.figure()
+        logspec_map=spec_map.copy()
+        logspec_map_pos_min = logspec_map[logspec_map>0].min()
+        logspec_map[logspec_map<logspec_map_pos_min]=logspec_map_pos_min/10
+        logspec_map=np.log(logspec_map)
+        plt.imshow(logspec_map,aspect="auto",
+        cmap='plasma',
         extent=[ppm_min,ppm_max,0,(time_max-time_min).total_seconds()/60,]
         )
         plt.colorbar()
-        plt.ylabel("time")
+        plt.ylabel(f"time [{time_unit}]")
         plt.xlabel("ppm")
 
         plt.savefig(os.path.join(path,"time_series_map_log.png"),dpi=300)
+        plt.close()
 
 
 

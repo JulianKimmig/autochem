@@ -37,7 +37,6 @@ def asymmetric_least_squares_smoothing(y, lam, p, niter=10):
         "baseline": z,
     }
 
-def median_correction(data):
-    median=np.median(data)
-    print(median)
-    return data-median, {"median": median}
+def median_correction(x, y):
+    median=np.median(y)
+    return x, y-median, {"median": median}

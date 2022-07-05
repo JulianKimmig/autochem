@@ -1,6 +1,8 @@
 data_processing:
-  - baseline_correction: median
   - normalization
+  - baseline_correction: median
+  - scaling:
+      max: 1
   - auto_shift:
       targets:
         - 1.6
