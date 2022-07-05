@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     logging.basicConfig()
 
-FOLDER = "D:\\TSU-141-E"
+FOLDER = "C:\\Users\\be34gof\Downloads\\20220211084759-PE-237-1-5°C"
 MIN_PEAK_HEIGHT= 0.1 # minimum peak height relative to the largest peak
 PEAK_BOARDER_RELATIVE_HEIGHT = 0.1 # peak height relative to the peak maximum which sets the integration limits
 MAX_PEAK_WIDTH = 1  # maximum peak with, to limit very small and broad peaks

@@ -121,18 +121,18 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
     peak_ids=None
     if "ranges" in peak_picking:
         peaks, peak_data = manual_peak_finder(y=data, x=ppm_scale,peak_ranges=peak_picking["ranges"],
-                                  #min_peak_height=peak_picking.get("min_peak_height",0.02),
-                                  #rel_height=peak_picking.get("rel_height",0.03),
-                                  #max_width=peak_picking.get("max_peak_width",np.inf),
-                                  #rel_prominence=peak_picking.get("rel_prominence",0.1),
-                                  center="max",
+                                min_peak_height=peak_picking.get("min_peak_height",peak_picking.get("min_height",0.02)),
+                                  rel_height=peak_picking.get("rel_height",0.03),
+                                  max_width=peak_picking.get("max_peak_width",np.inf),
+                                  rel_prominence=peak_picking.get("rel_prominence",0.1),
+                                  center="median",
                                   
                                   )          
         assert len(peaks) == len(peak_picking["ranges"])
 
     else:
-
-        peaks, peak_data = find_peaks(y=data, x=ppm_scale, min_peak_height=peak_picking.get("min_peak_height",peak_picking.get("min_height",0.02)),
+        peaks, peak_data = find_peaks(y=data, x=ppm_scale,
+                                min_peak_height=peak_picking.get("min_peak_height",peak_picking.get("min_height",0.02)),
                                   rel_height=peak_picking.get("rel_height",0.03),
                                   max_width=peak_picking.get("max_peak_width",np.inf),
                                   min_distance=peak_picking.get("min_distance",0.01),
@@ -140,7 +140,7 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
                                   center="max"
                                   )
 
-    
+
     if cutoff_ouside_data:
         #zoom to relevant areas
         ppm_min = ppm_scale[peak_data["peak_left_border"].min()]
@@ -153,7 +153,7 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
         ppm_min,
         ppm_max,
         )
-
+        print(zoom_indices)
         peaks, peak_data = cut_peaks_data(peaks, peak_data,*zoom_indices)
 
         if plotting['zoomed_data']:
@@ -173,19 +173,7 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
                                         peak_data=peak_data,
                                         )
 
-    if reference is not None:
-        pidx=None
-        
-        pidx, peak = get_reference_peak(
-        ppm_scale[peaks],
-        reference["ppm"],
-        max_diff=reference.get("window",np.inf))
-       
-
-        if pidx is not None:
-            scaler=reference.get("area",1) / peak_data["integrals"][pidx]
-            peak_data = factorize_peak_data(peak_data,scale_factor = scaler)
-
+    
     if plotting['result']:
         plt.plot(ppm_scale,data)
         plt.scatter(ppm_scale[peaks],data[peaks],c='r',marker='+')
@@ -229,7 +217,8 @@ def process_spectra(data:np.array,udic:Dict,data_processing:Dict,plotting:Dict,p
     df["Sample"] = udic['acqu'].get('Sample',"sample_name")
     df["#"]=np.arange(len(df))+1
     df.to_excel(os.path.join(path,"signals_ac.xlsx"),merge_cells=True)
-    return df,ppm_scale,data
+    raise NotImplementedError("integration not implemented")
+    return df
 
 
 def main(path,data_processing:List=None,parse_subfolders=True,plotting:Dict[str,bool]=None,peak_picking:Dict=None,cutoff_ouside_data=True,**kwargs):
